@@ -119,10 +119,10 @@ end
     x = 2randn(n)
     N = Optimization.Newton(f, x)
     N = Optimization.ArmijoStep(N)
-    for t in 1:32
+    for t in 1:64
         Optimization.update!(N, x, t)
         N.α = 1
-        if norm(gradient(f, x)) < ε
+        if norm(gradient(f, x)) < 1e-1ε
             break
         end
     end

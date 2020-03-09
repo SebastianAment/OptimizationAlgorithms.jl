@@ -5,7 +5,7 @@
 # sparse bayesian learning for regression
 # TODO: investigate direct optimization of nlml, not via em
 using LinearAlgebraExtensions: AbstractMatOrUni, AbstractMatOrFac
-using MyLazyArrays: inverse
+using LazyInverse: inverse
 struct SBL{T, AT, BT, GT} <: Update{T}
     AΣA::AT
     AΣb::BT

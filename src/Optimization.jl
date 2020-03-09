@@ -2,7 +2,7 @@ module Optimization
 
 using LinearAlgebra
 using Metrics
-using MyLazyArrays: difference
+using LinearAlgebraExtensions: difference
 
 # define euclidean metric
 const euclidean = Metrics.EuclideanMetric()
