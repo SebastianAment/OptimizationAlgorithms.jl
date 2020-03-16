@@ -44,7 +44,7 @@ objective(A::ArmijoStep) = objective(A.d)
 direction(A::ArmijoStep) = direction(A.d)
 
 # ε is smallest allowable step size
-function update!(A::ArmijoStep, x::AbstractVector, t::Int...)
+function update!(A::ArmijoStep, x, t::Int...)
     f = objective(A)
     y, d = valdir(A.d, x)
     dg = typeof(A.d) <: Gradient ? d'd : d'gradient(f, x)
@@ -82,7 +82,7 @@ function WolfeStep(d::D, c::T = .99, α = 1., decrease = 7., increase = 2.,
     ArmijoStep{T, D}(d, c, T(α), T(decrease), T(increase), maxbacktrack)
 end
 # solves for α s.t. x - αd satisfies Wolfe conditions
-function update!(W::WolfeStep, x::AbstractVector)
+function update!(W::WolfeStep, x)
     f = objective(W)
     direction!(W.d, x) # get direction and value
     y, d = value(W.d), direction(W.d) # should we get the value like this?
