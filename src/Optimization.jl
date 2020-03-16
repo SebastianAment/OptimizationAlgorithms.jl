@@ -7,6 +7,7 @@ using LinearAlgebraExtensions: difference
 # define euclidean metric
 const euclidean = Metrics.EuclideanMetric()
 
+# TODO: abstract away gradient computation for at least BFGS, LBFGS,
 # TODO: projections
 # TODO: Frank-Wolfe algorithm for linearly constrained convex problems
 # TODO: Lagrange multiplier methods
@@ -23,6 +24,7 @@ const euclidean = Metrics.EuclideanMetric()
 # "Runge–Kutta-like scaling techniques for first-order methods in convex optimization"
 
 ########################## Auto-Differentiation Setup ##########################
+# TODO: generalize from ForwardDiff
 # using ForwardDiff for most algorithms if no explicit descent direction is given
 import ForwardDiff: derivative, derivative!, gradient, gradient!,
     jacobian, jacobian!, hessian, hessian!
@@ -78,16 +80,16 @@ abstract type Direction{T} <: Update{T} end
 # D(x::AbstractVector, f::Function) method which computes the direction
 # and stores it in a field d
 (D::Update)(x::AbstractVector, t::Int) = update!(D, x, t)
-update!(D::Update, x::AbstractVector, t::Int) = update!(D, x)
+update!(D::Update, x, t::Int) = update!(D, x)
 
-function update!(D::Direction, x::AbstractVector)
+function update!(D::Direction, x)
     x .+= direction!(D, x)
 end
 # defined in case the Update is independent of the iteration counter t
-function update!(D::Direction, x::AbstractVector, t::Int)
+function update!(D::Direction, x, t::Int)
     x .+= direction!(D, x, t)
 end
-direction!(D::Direction, x::AbstractVector, t::Int) = direction!(D, x)
+direction!(D::Direction, x, t::Int) = direction!(D, x)
 
 # value(D::Update) = DiffResults.value(D.r)
 objective(d::Direction) = d.f
@@ -113,15 +115,16 @@ end
 ################################################################################
 struct Gradient{T, F, V, R} <: Direction{T}
     f::F # function to be optimized
+    # gradient! # abstract away gradient calculation
     d::V # direction
     r::R # differentiation result
-    function Gradient(f::F, x::V) where {T, V<:AbstractVector{T}, F}
+    function Gradient(f::F, x::V) where {T, V<:AbstractArray{T}, F}
         r = DiffResults.GradientResult(x)
         new{T, F, V, typeof(r)}(f, similar(x), r)
     end
 end
 # ? direction(G::Gradient) = DiffResults.gradient(G.r)
-function direction!(G::Gradient, x::AbstractVector)
+function direction!(G::Gradient, x::AbstractArray)
     gradient!(G.r, G.f, x) # strangely, this is still allocating
     G.d .= DiffResults.gradient(G.r)
     G.d .*= -1
@@ -129,6 +132,7 @@ end
 
 ################################################################################
 # newton's method for scalar-valued, vector-input functions
+# TODO: if I fancy, could make it work for AbstractArray inputs
 struct Newton{T, F, V, R} <: Direction{T}
     f::F
     d::V # direction
@@ -189,11 +193,11 @@ struct CustomDirection{T, F, FD, V} <: Direction{T}
     valgrad::FD # calculates objective value and gradient
     d::V # TODO: store direction in place
     function CustomDirection(f::F, valgrad::FD, x::V) where {T<:Number,
-                                                V<:AbstractVector{<:T}, F, FD}
+                                                V<:AbstractArray{<:T}, F, FD}
         new{T, F, FD, V}(f, valgrad, zero(x))
     end
 end
-valdir(D::CustomDirection, x::AbstractVector) = D.gradient(D, x)
+valdir(D::CustomDirection, x::AbstractArray) = D.gradient(D, x)
 
 ################################################################################
 # Gauss-Newton algorithm, minimizes sum of squares of vector-valued function f w.r.t. x
@@ -421,165 +425,10 @@ function update!(A::Adam, x::AbstractVector, t::Int, dx = gradient(A.f, x))
 end
 
 ################################################################################
-# TODO: preconditioning, could be external by running cg on
-# EAE'x = Eb where inv(E)inv(E)' = M where M is preconditioner
-# TODO: nonlinear
-# β = polyakribiere(dx₁, dx₂) = dx₁'(dx₁-dx₂) / (dx₂'dx₂)
-# Careful: does not like ill-conditioned systems
-struct ConjugateGradient{T, M, V} <: Update{T}
-    # f::F # nonlinear conjugate gradient
-    A::M # linear conjugate gradient
-    b::V # target
-    r₁::V # last two residuals
-    r₂::V
-    d::V # direction
-    Ad::V # product of A and direction
-    function ConjugateGradient(A::M, b::U, x::V) where {T<:Number,
-                    M<:AbstractMatrix{T}, U<:AbstractVector, V<:AbstractVector}
-        r₁ = copy(b)
-        mul!(r₁, A, x, -1., 1.) # r = b - Ax
-        d = copy(r₁)
-        r₂ = similar(b)
-        Ad = similar(b)
-        new{T, M, V}(A, b, r₁, r₂, d, Ad)
-    end
-end
-# no allocations :)
-function update!(C::ConjugateGradient, x::AbstractVector, t::Int)
-    if t > 1
-        # this changes for non-linear problems
-        β = sum(abs2, C.r₁) / sum(abs2, C.r₂) # new over old residual norm
-        @. C.d = β*C.d + C.r₁  # axpy!
-    elseif t ≥ length(x) # algorithm does not have guarantees after n iterations
-        return x
-    end
-    # this is the only line that is explicitly linear
-    mul!(C.Ad, C.A, C.d) # C.Ad = C.A * C.d
-    α = sum(abs2, C.r₁) / dot(C.d, C.Ad)
-    @. x += α * C.d # this directly updates x -> <:Update
-    copy!(C.r₂, C.r₁) # could get around doing this copy with circular buffer
-    @. C.r₁ -= α * C.Ad
-    x
-end
-# TODO: more iterative methods: GMRES, Arnoldi, Lanczos
+include("linearsolvers.jl")
 include("compressedsensing.jl")
-
 include("ode.jl")
-############################ Step Size Selectors ###############################
-# generalizes search for an α such that (x - α * direction) leads to minimizer
-
-# TODO: if we want to keep track of last α, could have 0D array and still have immutable object
-# α = zeros(), or Array{Float64, 0}(undef)
-# TODO: employ local / global optimization for optimal step size selection?
-
-# if f isa StepSize, should be able to call with f(x, f, d, α, n)
-# where x is the current parameter vector,
-# f is the function to be minimized
-# d(x) is the direction to be taken
-# α is the first guess at a step size
-# n is the iteration number in the optimization routine
-struct ConstantStep{T, D<:Direction} <: Direction{T}
-    d::D
-    α::T
-end
-# decide if I want to represent the multiplication lazily
-# direction(C::ConstantStep) = C.α * direction(C.d) # introduces temporary
-function direction!(C::ConstantStep, x::AbstractVector)
-    direction!(C.d, x) # update direction vector
-    direction(C.d) .*= C.α # multiply direction with step-size
-end
-# function update!(C::ConstantStep, x::AbstractVector)
-#     direction!(C.d, x) # update direction vector
-#     x .+= C.α .* direction(C.d)
-# end
-
-################################################################################
-# TODO: specialize for 1D input
-mutable struct ArmijoStep{T, D<:Direction} <: Direction{T}
-    d::D # direction κατεύθυνση
-    c::T # coefficient in Armijo rule
-    α::T # last α, has to be 0D array, or armijo is mutable (went with mutable)
-    decrease::T # μείωση factor
-    increase::T # αύξηση factor
-    maxbacktrack::Int
-end
-function ArmijoStep(d::D, c::T = 0, α = 1., decrease = 3., increase = 2.,
-                            maxbacktrack::Int = 16) where {T, D<:Direction}
-    ArmijoStep{T, D}(d, c, T(α), T(decrease), T(increase), maxbacktrack)
-end
-objective(A::ArmijoStep) = objective(A.d)
-direction(A::ArmijoStep) = direction(A.d)
-
-# ε is smallest allowable step size
-function update!(A::ArmijoStep, x::AbstractVector, t::Int...)
-    f = objective(A)
-    y, d = valdir(A.d, x)
-    dg = typeof(A.d) <: Gradient ? d'd : d'gradient(f, x)
-    α = A.α # initial α
-    xn = x + α*d # could pre-allocate space for x + α * d
-    for i in 1:A.maxbacktrack
-        if (f(xn) ≤ y + α * A.c * dg) #|| α < ε # rule for minimization
-            copy!(x, xn)  # only if we jump out with a good step size, reassign x to xn
-            break
-        else
-            α /= A.decrease
-            @. xn = x + α*d
-        end
-    end
-    # A.α = α * A.increase
-    return x
-end
-# function update!(A::ArmijoStep, x::AbstractVector)
-#     x .+= A.α *
-# end
-
-# TODO: Could rename Damped, so type reads e.g. Damped{Newton}
-# 0 < c₁ < c₂ < 1
-mutable struct WolfeStep{T, D<:Direction{T}} <: Update{T}
-    d::D
-    c₁::T
-    c₂::T
-    α::T
-    decrease::T # μείωση factor
-    increase::T # αύξηση factor
-    maxbacktrack::Int
-end
-function WolfeStep(d::D, c::T = .99, α = 1., decrease = 7., increase = 2.,
-                            maxbacktrack::Int = 16) where {T, D<:Direction}
-    ArmijoStep{T, D}(d, c, T(α), T(decrease), T(increase), maxbacktrack)
-end
-# solves for α s.t. x - αd satisfies Wolfe conditions
-function update!(W::WolfeStep, x::AbstractVector)
-    f = objective(W)
-    direction!(W.d, x) # get direction and value
-    y, d = value(W.d), direction(W.d) # should we get the value like this?
-    dg = typeof(W.d) <: Gradient ? d'd : d'gradient(f, x)
-    α = W.α # initial α
-    xn = x + α*d # could pre-allocate space for x + α * d
-    for i in 1:W.maxbacktrack
-        armijo = f(xn) ≤ y + α * W.c₁ * dg
-        curv = abs(d'gradient(f, xn)) ≤ abs(W.c₂ * dg)
-        if armijo && curv # rule for minimization
-            break
-        else
-            α /= W.decrease
-            @. xn = x + α*d
-        end
-    end
-    W.α = α * W.increase
-    copy!(x, xn)
-end
-
-################################################################################
-# struct TimeDependentStep{T, D<:Direction} <: Direction{T}
-#     d::D
-#     α::T
-# end
-# function update!(C::TimeDependentStep, x::AbstractVector, t::Int)
-#     direction!(C.d, x)
-#     C.d .*= C.α(t)
-#     x .+= direction(C.d)
-# end
+include("stepsizes.jl")
 
 ########################### Stopping Criteria ###################################
 
@@ -671,6 +520,8 @@ function gaussnewton(f)
     d(x::AbstractVector) = -jacobian(f, x) \ f(x)
 end
 
+end
+
 ######################### Convenience functions ################################
 # intervalProjection(x, a, b) = max(min(x, b), a)
 # intervalProjection!(y, x, a, b) = (@. y = max(min(x, b), a))
@@ -690,25 +541,4 @@ end
 # end
 # function curvature_rule(xn, f, dg, c, α)
 #     abs(d'gradient(f, xn)) ≤ abs(c*dg) # weak rule: -d'∇(x + α*d) ≤ -c*d'∇(x)
-# end
-
-end
-
-# allocating
-# function descent(x, f, direction;
-#                 maxiter::Int = 128, update!,
-#                 α::AbstractStepSize, # initial step size
-#                 ε::Real = 1e-8, # minimum absolute change in function f for termination
-#                 δ::Real = 1e-8, # minimum absolute change in parameters x for termination
-#                 projection = identity) # think about the projection step
-#     old_x = zero(x)
-#     y = f(x)
-#     for t in 1:maxiter
-#         old_x, old_y = x, y
-#         x += α(t) * direction(x)
-#         if euclidean(x, old_x) < δ || abs(y - old_y) < ε
-#             break
-#         end
-#     end
-#     return x, val, iter
 # end

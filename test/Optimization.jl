@@ -114,15 +114,15 @@ end
     @test norm(gradient(f, x)) < ε
 
     # higher-dimensional non-quadratic
-    ε = 1e-10
+    ε = 1e-8
     f(x) = (x-μ)'A*(x-μ) - sum(x->log(abs2(x)), x)
     x = 2randn(n)
     N = Optimization.Newton(f, x)
     N = Optimization.ArmijoStep(N)
-    for t in 1:64
+    for t in 1:128
         Optimization.update!(N, x, t)
         N.α = 1
-        if norm(gradient(f, x)) < 1e-1ε
+        if norm(gradient(f, x)) < ε
             break
         end
     end
