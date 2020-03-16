@@ -38,7 +38,7 @@ hessian(f) = x -> hessian(f, x)
 
 ######################## General Fixed Point Algorithm #########################
 # attempts to find a fixed point of f! by iterating f! on x
-function fixedpoint!(f!, x::AbstractVector, isfixed)
+function fixedpoint!(f!, x, isfixed)
     t = 1
     while !isfixed(x, t)
         f!(x, t)
@@ -47,11 +47,11 @@ function fixedpoint!(f!, x::AbstractVector, isfixed)
     x, t
 end
 # using default stopping criterion
-fixedpoint!(f!, x::AbstractVector) = fixedpoint!(f!, x, StoppingCriterion(x))
+fixedpoint!(f!, x) = fixedpoint!(f!, x, StoppingCriterion(x))
 
 ########################### Stopping Criterion ##################################
 # abstract type StoppingCriterion{T} end
-mutable struct StoppingCriterion{T, V<:AbstractVector} #<: StoppingCriterion{T}
+mutable struct StoppingCriterion{T, V} #<: StoppingCriterion{T}
     δ::T # minimum absolute change in parameters x for termination
     x::V # holds last value of parameters
     maxiter::Int # maximum iterations
@@ -59,9 +59,9 @@ mutable struct StoppingCriterion{T, V<:AbstractVector} #<: StoppingCriterion{T}
     # y::T # holds last function value
 end
 StoppingCriterion(x) = StoppingCriterion(1e-6, fill(Inf, size(x)), 128)
-function (T::StoppingCriterion)(x::AbstractVector, t)
+function (T::StoppingCriterion)(x::AbstractArray, t)
     val = euclidean(x, T.x) < T.δ || t > T.maxiter # || abs(y - T.y) < ε
-    typeof(x) <: AbstractVector ? copy!(T.x, x) : (T.x = x)
+    copy!(T.x, x)
     return val
 end
 
