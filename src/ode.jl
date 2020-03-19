@@ -1,4 +1,13 @@
 ############################### ODE Integrators ################################
+# restrict to ODE integrators? could use for gradient flow.
+function simulate(U::Update, x, ti::Real, tf::Real)
+    t = ti
+    while t < tf
+        x, t = U(x, t)
+    end
+    x, t
+end
+
 ################################# Runge Kutta ##################################
 # TODO: adaptive step size, have to make them mutable?
 struct Euler{T, F} <: Update{T}
@@ -8,7 +17,7 @@ end
 const RK1 = Euler
 (E::Euler)(x, t) = update(E, x, t)
 function update(R::Euler, x, t::Real)
-    x += R.Δ * R.f(t, x)
+    x += R.Δ * R.f(t, x) # TODO: make t second argument
     t += R.Δ
     return x, t
 end

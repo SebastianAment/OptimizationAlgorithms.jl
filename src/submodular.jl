@@ -1,4 +1,5 @@
 ########################### Submodular Minimization ############################
+# greedy algorithm for submodular minimization
 struct Submodular{T, F, X, D} <: Update{T}
     f::F # set-valued input function
     x::X # set to choose from
@@ -11,7 +12,7 @@ struct Submodular{T, F, X, D} <: Update{T}
 end
 # TODO: parallelization, especially for first pass
 function update!(S::Submodular, x::Union{AbstractVector, AbstractSet})
-    length(x) ≥ S.n ? return x : nothing # only add if we haven't hit maximum cardinality
+    length(x) ≥ S.n ? (return x) : nothing # only add if we haven't hit maximum cardinality
     f, δ, grid = S.f, S.δ, S.x
     ind = sortperm(δ) # sort grid according to increasing δ (decreasing in magnitude)
     permute!(δ, ind)

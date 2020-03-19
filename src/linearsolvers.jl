@@ -1,10 +1,11 @@
 # TODO: more iterative methods: GMRES, Arnoldi, Lanczos
 ################################################################################
+# TODO: use circular buffer to get rid of copy
 # TODO: preconditioning, could be external by running cg on
 # EAE'x = Eb where inv(E)inv(E)' = M where M is preconditioner
 # TODO: nonlinear
 # β = polyakribiere(dx₁, dx₂) = dx₁'(dx₁-dx₂) / (dx₂'dx₂)
-# Careful: does not like ill-conditioned systems
+# Careful with ill-conditioned systems
 struct ConjugateGradient{T, M, V} <: Update{T}
     # f::F # nonlinear conjugate gradient
     A::M # linear conjugate gradient
@@ -33,7 +34,7 @@ function update!(C::ConjugateGradient, x::AbstractVector, t::Int)
         return x
     end
     # this is the only line that is explicitly linear
-    mul!(C.Ad, C.A, C.d) # C.Ad = C.A * C.d
+    mul!(C.Ad, C.A, C.d) # C.Ad = C.A * C.d; could be f(d) if f is nonlinear
     α = sum(abs2, C.r₁) / dot(C.d, C.Ad)
     @. x += α * C.d # this directly updates x -> <:Update
     copy!(C.r₂, C.r₁) # could get around doing this copy with circular buffer
