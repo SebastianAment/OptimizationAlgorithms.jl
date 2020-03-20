@@ -1,3 +1,4 @@
+# TODO: quasi-exact line search via interpolation, GPs
 ############################ Step Size Selectors ###############################
 # generalizes search for an α such that (x - α * direction) leads to minimizer
 # struct ConstantStep{T, D<:Direction} <: Direction{T}

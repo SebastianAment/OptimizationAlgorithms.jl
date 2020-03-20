@@ -93,6 +93,7 @@ valuedirection(D::Direction) = (x, t) -> valdir(D, x, t)
 const valdir = valuedirection
 
 ################################################################################
+include("util.jl")
 include("descentdirections.jl")
 include("descentupdates.jl")
 include("stochastic.jl")

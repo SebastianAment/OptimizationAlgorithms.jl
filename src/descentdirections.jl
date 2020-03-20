@@ -110,120 +110,116 @@ end
 
 ################################################################################
 # Broyden-Fletcher-Goldfarb-Shanno algorithm
-# TODO: more pre-allocation (s, y)
-struct BFGS{T, F, M, D, R, N} <: Direction{T}
+# TODO: move first iteration into constructor, and so too with LBFGS
+struct BFGS{T, F, G, M, X} <: Direction{T}
     f::F
-    # gradient::G
-    B::M # approximation to inverse Hessian
-    d::D
-    r::R
-    x::N # old x
-    function BFGS(f::F, x::V) where {T, F, V<:AbstractVector{T}}
-        B = Matrix((1e-10I)(length(x)))
-        r = GradientResult(x)
-        d = -B*gradient(f, x) # TODO: figure out descent in deterministic case should be chosen with line search
+    gradient::G
+    H⁻¹::M # approximation to inverse Hessian
+    x::X # old x
+    ∇::X # old gradient
+    d::X # direction
+    y::X # pre-allocate temporary storage
+    s::X
+    function BFGS(f::F, x::V, g::G = Gradient(f, x)) where {T, F, G,
+                                                            V<:AbstractVector{T}}
+        H⁻¹ = Matrix((1e-6I)(length(x)))
+        ∇ = -g(x)
+        d = -H⁻¹*∇ # TODO: descent in deterministic case should be chosen with line search
         xold = copy(x)
         x .+= d
-        new{T, F, typeof(B), V, typeof(r), V}(f, B, d, r, xold)
+        s, y = zero(x), zero(x)
+        new{T, F, G, typeof(H⁻¹), V}(f, g, H⁻¹, xold, ∇, d, s, y)
     end
 end
 # for Directions which need initialization, have initialize! ?
 # would get rid of special case t == 1, similar with LBFGS below
-# TODO: limit memory allocations
 function valdir(N::BFGS, x::AbstractVector, t::Int)
-    gradient!(N.r, N.f, x)
-    ∇ = DiffResults.gradient(N.r)
-    y = ∇ - FD.gradient(N.f, N.x) #
-    # ∇ = N.gradient(N.r)
-    # y = ∇ - N.gradient(N.f, N.x) # if f is stochastic, have to be careful about consistency here
-    # s = N.d # this relies on step size selector to modify d, instead:
-    s = x - N.x
-    if t == 1
-        N.B[diagind(N.B)] .= (s'y) / sum(abs2, y) # put in constructor?
-    else
-        ρ = 1/(s'y)
-        A = (I - ρ*s*y') # pre-allocate?
-        # mul!(N.B, A, N.B) # can't alias N.B
-        N.B .= A * N.B * A' + ρ*s*s' # woodbury?
-    end
-    copy!(N.x, x) # store old parameter # TODO: maybe shift this to update!
-    # this is the only line to be replaced for LBFGS
-    mul!(N.d, N.B, ∇)
+    value, ∇ = valdir(N.gradient, x) # this should maybe be valdir?
+    ∇ .*= -1 # since we get the direction, (negative gradient)
+    @. N.s = x - N.x; copy!(N.x, x) # update s and save current x
+    @. N.y = ∇ - N.∇; copy!(N.∇, ∇) # if f is stochastic, have to be careful about consistency here
+    bfgs_update!(N.H⁻¹, N.s, N.y, t)
+    mul!(N.d, N.H⁻¹, ∇)
     N.d .*= -1
-    return DiffResults.value(N.r), N.d
+    return value, N.d
 end
-
-################################################################################
-using DataStructures: CircularBuffer
-
-# convenience for circular buffer
-# does in place copy of x in front of buffer, important if cb is buffer of arrays
-function copyfirst!(cb::CircularBuffer, x)
-    cb.first = (cb.first == 1 ? cb.capacity : cb.first - 1)
-    if length(cb) < cb.capacity
-        cb.length += 1 # this probably shouldn't happen in this context
+# updates inverse hessian with bfgs strategy
+function bfgs_update!(H⁻¹::AbstractMatrix, s::AbstractVector, y::AbstractVector, t::Int)
+    if s'y > 0 # function strongly convex -> update inverse Hessian
+        if t == 1
+            H⁻¹[diagind(H⁻¹)] .= (s'y) / sum(abs2, y) # put in constructor?
+        else # could also use recursive algorithm here to reduce memory footprint (see below)
+            ρ = 1/(s'y)
+            A = (I - ρ*s*y') # TODO: pre-allocate?
+            H⁻¹ .= A * H⁻¹ * A' .+ ρ*s*s' # woodbury?
+        end
     end
-    copy!(cb.buffer[cb.first], x)
+    return H⁻¹
 end
-
+# else # re-initialize inverse hessian to diagonal, if not strongly convex
+#     N.H⁻¹ .= I(length(x))
+# BFGS update corresponds to updating the Hessian as:
+# Hs = N.H*s
+# N.H .= N.H + y*y'*ρ - Hs*Hs' / dot(s, N.H, s)
 ################################################################################
 # limited memory Broyden-Fletcher-Goldfarb-Shanno algorithm
-struct LBFGS{T, F, D, V, R} <: Direction{T}
+struct LBFGS{T, F, G, X, V, A} <: Direction{T}
     f::F
-    d::D
+    gradient::G
+    x::X # old x
+    ∇::X # old gradient
+    d::X # direction
     s::V # previous m descent increments (including step size)
     y::V # previous m gradient differences
     m::Int # maximum recursion depth
-    r::R # diff result
-    x::D # old x
-    function LBFGS(f::F, x::V, m::Int) where {T, F, V<:AbstractVector{T}}
+    α::A
+    function LBFGS(f::F, x::X, m::Int, g::G = Gradient(f, x)) where {T, F,
+                                                        G, X<:AbstractVector{T}}
         m ≥ 1 || error("recursion depth m cannot be smaller than 1")
         n = length(x)
-        s = CircularBuffer{Vector{T}}(m) # TODO: these could be static arrays
-        y = CircularBuffer{Vector{T}}(m)
+        s = CircularBuffer{X}(m) # TODO: elements could be static arrays
+        y = CircularBuffer{X}(m)
+        V = typeof(s)
         for i in 1:m
             push!(s, zeros(n))
             push!(y, zeros(n))
         end
-        r = GradientResult(x)
-
-        # first step, need this to compute differences in direction!
         xold = copy(x)
-        G = Gradient(f, x) #ArmijoStep(Gradient(f, x)) # in stochastic setting should NOT be chosen with line search
-        update!(G, x)
-        d = x - xold #direction(G, x)
-        new{T, F, V, typeof(s), typeof(r)}(f, d, s, y, m, r, xold)
+        ∇ = -g(x)
+        d = -1e-6*∇
+        x .+= d # TODO: initial stepsize selection?
+        α = zeros(eltype(x), m)
+        new{T, F, G, X, V, typeof(α)}(f, g, xold, ∇, d, s, y, m, α)
     end
 end
 
-# TODO: limit memory allocations
 function valdir(N::LBFGS, x::AbstractVector, t::Int)
-    gradient!(N.r, N.f, x)
-    ∇ = DiffResults.gradient(N.r)
-    copyfirst!(N.y, difference(∇, gradient(N.f, N.x))) # difference to avoid temporary
-    # copyfirst!(N.s, N.d) # this relies on step size selector to modify d, instead:
-    copyfirst!(N.s, difference(x, N.x))
-    copy!(N.x, x) # store old parameter # TODO: maybe shift this to update!
+    value, ∇ = valdir(N.gradient, x)
+    copy!(N.d, ∇)
+    ∇ .*= -1 # since we get the direction, (negative gradient)
+    copyfirst!(N.s, difference(x, N.x)); copy!(N.x, x) # difference to avoid temporary
+    copyfirst!(N.y, difference(∇, N.∇)); copy!(N.∇, ∇)
+    α = t < N.m ? view(N.α, 1:t) : N.α # limit recursion if we haven't stepped enough
+    lbfgs_recursion!(N.d, N.s, N.y, α, t)
+    return value, N.d
+end
 
-    # approximate hessian (lbfgs direction update)
-    copy!(N.d, ∇) # TODO: figure out descent
-    p = N.d
-    s = N.s; y = N.y;
-    m = min(t, N.m)
-    α = zeros(eltype(x), m)
+# recursive algorithm to compute gradient hessian product
+# WARNING: d has to be initialized with the negative gradient
+function lbfgs_recursion!(d::AbstractVector, s, y, α, t::Int)
+    m = length(α)
     for i in 1:m
-        α[i] = (s[i]'p) / (s[i]'y[i])
-        p .-= α[i] * y[i]
+        α[i] = dot(s[i], d) / dot(s[i], y[i])
+        d .-= α[i] * y[i]
     end
     if t > 1
-        p .*= (s[1]'y[1]) / (y[1]'y[1])
+        d .*= dot(s[1], y[1]) / sum(abs2, y[1])
     end
     for i in reverse(1:m)
-        β_i = (y[i]'p) / (y[i]'s[i])
-        p .+= (α[i] - β_i) * s[i]
+        β_i = dot(y[i], d) / dot(y[i], s[i])
+        d .+= (α[i] - β_i) * s[i]
     end
-    N.d .*= -1
-    return DiffResults.value(N.r), N.d
+    return d
 end
 
 ################################################################################

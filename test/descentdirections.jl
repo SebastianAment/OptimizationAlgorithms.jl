@@ -17,7 +17,7 @@ using ForwardDiff: derivative, gradient
     G = Optimization.ScaledGradient(f, x)
     U = Optimization.update!(G)
     ε = 1e-6
-    fixedpoint!(U, x, StoppingCriterion(x, 1e-2ε))
+    x, t = fixedpoint!(U, x, StoppingCriterion(x, 1e-2ε))
     @test norm(gradient(f, x)) < ε
 end
 
@@ -74,7 +74,7 @@ end
     B = Optimization.BFGS(f, x)
     U = Optimization.update!(B)
     ε = 1e-6
-    fixedpoint!(U, x, StoppingCriterion(x, 1e-2ε))
+    x, t = fixedpoint!(U, x, StoppingCriterion(x, 1e-2ε))
     @test norm(gradient(f, x)) < ε
 
     # limited-memory BFGS
@@ -82,13 +82,16 @@ end
     B = Optimization.LBFGS(f, x, 4)
     U = Optimization.update!(B)
     ε = 1e-6
-    fixedpoint!(U, x, StoppingCriterion(x, 1e-2ε))
+    x, t = fixedpoint!(U, x, StoppingCriterion(x, 1e-2ε))
     @test norm(gradient(f, x)) < ε
 
     # higher-dimensional non-quadratic
+    x = randn(n)
     f(x) = 1/2*(x-μ)'A*(x-μ) - sum(x->log(abs2(x)), x)
     B = Optimization.LBFGS(f, x, 4)
     U = Optimization.update!(B)
+    # @time U(x, 1)
+    # @time U(x, 2)
     ε = 1e-6
     fixedpoint!(U, x, StoppingCriterion(x, 1e-2ε))
     @test norm(gradient(f, x)) < ε
