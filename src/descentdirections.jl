@@ -111,61 +111,57 @@ end
 ################################################################################
 # Broyden-Fletcher-Goldfarb-Shanno algorithm
 # TODO: move first iteration into constructor, and so too with LBFGS
-struct BFGS{T, F, G, M, X} <: Direction{T}
-    f::F
-    gradient::G
+struct BFGS{T, D, M, X} <: Direction{T}
+    direction::D
     H⁻¹::M # approximation to inverse Hessian
     x::X # old x
     ∇::X # old gradient
     d::X # direction
     y::X # pre-allocate temporary storage
     s::X
-    function BFGS(f::F, x::V, g::G = Gradient(f, x)) where {T, F, G,
-                                                            V<:AbstractVector{T}}
+    function BFGS(dir::D, x::X) where {T, D<:Direction, X<:AbstractVector{T}}
         H⁻¹ = Matrix((1e-6I)(length(x)))
-        ∇ = -g(x)
+        ∇ = -dir(x)
         d = -H⁻¹*∇ # TODO: descent in deterministic case should be chosen with line search
         xold = copy(x)
         x .+= d
-        s, y = zero(x), zero(x)
-        new{T, F, G, typeof(H⁻¹), V}(f, g, H⁻¹, xold, ∇, d, s, y)
+        s, y = (x - xold), (-dir(x) - ∇)
+        H⁻¹[diagind(H⁻¹)] .= (s'y) / sum(abs2, y) # takes care of scaling issues
+        new{T, D, typeof(H⁻¹), X}(dir, H⁻¹, xold, ∇, d, s, y)
     end
 end
-# for Directions which need initialization, have initialize! ?
-# would get rid of special case t == 1, similar with LBFGS below
-function valdir(N::BFGS, x::AbstractVector, t::Int)
-    value, ∇ = valdir(N.gradient, x) # this should maybe be valdir?
+BFGS(f::Function, x) = BFGS(Gradient(f, x), x)
+BFGS(f::Function, ∇::Function, x) = BFGS(CustomDirection(f, x->(f(x), -∇(x)), x), x)
+
+function valdir(N::BFGS, x::AbstractVector)
+    value, ∇ = valdir(N.direction, x) # this should maybe be valdir?
     ∇ .*= -1 # since we get the direction, (negative gradient)
     @. N.s = x - N.x; copy!(N.x, x) # update s and save current x
     @. N.y = ∇ - N.∇; copy!(N.∇, ∇) # if f is stochastic, have to be careful about consistency here
-    bfgs_update!(N.H⁻¹, N.s, N.y, t)
+    bfgs_update!(N.H⁻¹, N.s, N.y)
     mul!(N.d, N.H⁻¹, ∇)
     N.d .*= -1
     return value, N.d
 end
 # updates inverse hessian with bfgs strategy
-function bfgs_update!(H⁻¹::AbstractMatrix, s::AbstractVector, y::AbstractVector, t::Int)
+# could also use recursive algorithm here to reduce memory footprint (see below)
+function bfgs_update!(H⁻¹::AbstractMatrix, s::AbstractVector, y::AbstractVector)
     if s'y > 0 # function strongly convex -> update inverse Hessian
-        if t == 1
-            H⁻¹[diagind(H⁻¹)] .= (s'y) / sum(abs2, y) # put in constructor?
-        else # could also use recursive algorithm here to reduce memory footprint (see below)
-            ρ = 1/(s'y)
-            A = (I - ρ*s*y') # TODO: pre-allocate?
-            H⁻¹ .= A * H⁻¹ * A' .+ ρ*s*s' # woodbury?
-        end
+        ρ = 1/(s'y)
+        A = (I - ρ*s*y') # TODO: pre-allocate?
+        H⁻¹ .= A * H⁻¹ * A' .+ ρ*s*s' # TODO: woodbury?
     end
     return H⁻¹
 end
 # else # re-initialize inverse hessian to diagonal, if not strongly convex
 #     N.H⁻¹ .= I(length(x))
-# BFGS update corresponds to updating the Hessian as:
+# BFGS update corresponds to updating the Hessian as: (use for woodbury)
 # Hs = N.H*s
 # N.H .= N.H + y*y'*ρ - Hs*Hs' / dot(s, N.H, s)
 ################################################################################
 # limited memory Broyden-Fletcher-Goldfarb-Shanno algorithm
-struct LBFGS{T, F, G, X, V, A} <: Direction{T}
-    f::F
-    gradient::G
+struct LBFGS{T, D, X, V, A} <: Direction{T}
+    direction::D
     x::X # old x
     ∇::X # old gradient
     d::X # direction
@@ -173,48 +169,50 @@ struct LBFGS{T, F, G, X, V, A} <: Direction{T}
     y::V # previous m gradient differences
     m::Int # maximum recursion depth
     α::A
-    function LBFGS(f::F, x::X, m::Int, g::G = Gradient(f, x)) where {T, F,
-                                                        G, X<:AbstractVector{T}}
+    function LBFGS(dir::D, x::X, m::Int) where {T, D<:Direction, X<:AbstractVector{T}}
         m ≥ 1 || error("recursion depth m cannot be smaller than 1")
         n = length(x)
         s = CircularBuffer{X}(m) # TODO: elements could be static arrays
         y = CircularBuffer{X}(m)
         V = typeof(s)
         for i in 1:m
-            push!(s, zeros(n))
-            push!(y, zeros(n))
+            s.buffer[i] = zeros(n)
+            y.buffer[i] = zeros(n)
         end
         xold = copy(x)
-        ∇ = -g(x)
+        ∇ = -dir(x)
         d = -1e-6*∇
         x .+= d # TODO: initial stepsize selection?
         α = zeros(eltype(x), m)
-        new{T, F, G, X, V, typeof(α)}(f, g, xold, ∇, d, s, y, m, α)
+        new{T, D, X, V, typeof(α)}(dir, xold, ∇, d, s, y, m, α)
     end
 end
+LBFGS(f::Function, x, m::Int) = LBFGS(Gradient(f, x), x, m)
+function LBFGS(f::Function, ∇::Function, x, m::Int)
+    LBFGS(CustomDirection(f, x->(f(x), -∇(x)), x), x, m)
+end
 
-function valdir(N::LBFGS, x::AbstractVector, t::Int)
-    value, ∇ = valdir(N.gradient, x)
+function valdir(N::LBFGS, x::AbstractVector)
+    value, ∇ = valdir(N.direction, x)
     copy!(N.d, ∇)
     ∇ .*= -1 # since we get the direction, (negative gradient)
     copyfirst!(N.s, difference(x, N.x)); copy!(N.x, x) # difference to avoid temporary
     copyfirst!(N.y, difference(∇, N.∇)); copy!(N.∇, ∇)
+    t = length(N.s)
     α = t < N.m ? view(N.α, 1:t) : N.α # limit recursion if we haven't stepped enough
-    lbfgs_recursion!(N.d, N.s, N.y, α, t)
+    lbfgs_recursion!(N.d, N.s, N.y, α)
     return value, N.d
 end
 
 # recursive algorithm to compute gradient hessian product
 # WARNING: d has to be initialized with the negative gradient
-function lbfgs_recursion!(d::AbstractVector, s, y, α, t::Int)
+function lbfgs_recursion!(d::AbstractVector, s, y, α)
     m = length(α)
     for i in 1:m
         α[i] = dot(s[i], d) / dot(s[i], y[i])
         d .-= α[i] * y[i]
     end
-    if t > 1
-        d .*= dot(s[1], y[1]) / sum(abs2, y[1])
-    end
+    d .*= dot(s[1], y[1]) / sum(abs2, y[1]) # apply scaling
     for i in reverse(1:m)
         β_i = dot(y[i], d) / dot(y[i], s[i])
         d .+= (α[i] - β_i) * s[i]

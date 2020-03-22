@@ -15,9 +15,8 @@ using ForwardDiff: derivative, gradient
     f(x) = (x-μ)'A*(x-μ)
     x = randn(n)
     G = Optimization.ScaledGradient(f, x)
-    U = Optimization.update!(G)
     ε = 1e-6
-    x, t = fixedpoint!(U, x, StoppingCriterion(x, 1e-2ε))
+    x, t = fixedpoint!(G, x, StoppingCriterion(x, 1e-2ε))
     @test norm(gradient(f, x)) < ε
 end
 
@@ -55,9 +54,8 @@ end
     f(x) = 1/2*(x-μ)'A*(x-μ) - sum(x->log(abs2(x)), x)
     x = 2randn(n)
     N = Optimization.Newton(f, x)
-    U = Optimization.update!(N)
     ε = 1e-6
-    fixedpoint!(U, x, StoppingCriterion(x, 1e-2ε))
+    fixedpoint!(N, x, StoppingCriterion(x, 1e-2ε))
     @test norm(gradient(f, x)) < ε
 end
 
@@ -72,28 +70,35 @@ end
 
     x = randn(n)
     B = Optimization.BFGS(f, x)
-    U = Optimization.update!(B)
     ε = 1e-6
-    x, t = fixedpoint!(U, x, StoppingCriterion(x, 1e-2ε))
+    x, t = fixedpoint!(B, x, StoppingCriterion(x, 1e-2ε))
+    # println(t)
     @test norm(gradient(f, x)) < ε
 
     # limited-memory BFGS
+    m = 3
     x = randn(n)
-    B = Optimization.LBFGS(f, x, 4)
-    U = Optimization.update!(B)
+    B = Optimization.LBFGS(f, x, m)
     ε = 1e-6
-    x, t = fixedpoint!(U, x, StoppingCriterion(x, 1e-2ε))
+    x, t = fixedpoint!(B, x, StoppingCriterion(x, 1e-2ε))
+    # println(t)
     @test norm(gradient(f, x)) < ε
 
     # higher-dimensional non-quadratic
-    x = randn(n)
     f(x) = 1/2*(x-μ)'A*(x-μ) - sum(x->log(abs2(x)), x)
-    B = Optimization.LBFGS(f, x, 4)
-    U = Optimization.update!(B)
-    # @time U(x, 1)
-    # @time U(x, 2)
+
+    x = randn(n)
+    B = Optimization.BFGS(f, x)
     ε = 1e-6
-    fixedpoint!(U, x, StoppingCriterion(x, 1e-2ε))
+    x, t = fixedpoint!(B, x, StoppingCriterion(x, 1e-2ε))
+    # println(t)
+    @test norm(gradient(f, x)) < ε
+
+    x = randn(n)
+    B = Optimization.LBFGS(f, x, m)
+    ε = 1e-6
+    x, t = fixedpoint!(B, x, StoppingCriterion(x, 1e-2ε))
+    # println(t)
     @test norm(gradient(f, x)) < ε
 end
 
@@ -112,9 +117,8 @@ end
     valdir(x, t) = valdir(x)
     x = randn(n)
     B = Optimization.CustomDirection(f, valdir, x)
-    U = Optimization.update!(B)
     ε = 1e-6
-    fixedpoint!(U, x, StoppingCriterion(x, 1e-2ε))
+    fixedpoint!(B, x, StoppingCriterion(x, 1e-2ε))
     @test norm(gradient(f, x)) < ε
 end
 

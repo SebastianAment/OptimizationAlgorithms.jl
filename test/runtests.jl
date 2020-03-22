@@ -1,3 +1,4 @@
+include("util.jl")
 include("descentdirections.jl")
 include("descentupdates.jl")
 include("compressedsensing.jl")

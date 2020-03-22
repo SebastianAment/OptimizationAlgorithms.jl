@@ -7,15 +7,12 @@ using LinearAlgebraExtensions: difference
 # define euclidean metric
 const euclidean = Metrics.EuclideanMetric()
 
-# TODO: abstract away gradient computation for at least BFGS, LBFGS,
-# TODO: all directions / updates seem to be time independent, except BFGS, LBFGS, ADAM
+# TODO: all directions / updates seem to be time independent, except ADAM
 # TODO: projections
 # TODO: Frank-Wolfe algorithm for linearly constrained convex problems
 # TODO: Lagrange multiplier methods
+# TODO: partitioned quasi-newton methods for constrained optimization (Coleman)
 # TODO: Proximal methods, proximal operators, e.g. for l1 regularized minimization
-
-# DESIGN: instead or in addition of direction, can also have update strategies
-# dependent on x and d (for example including projection, constrained quadratic programming)
 
 # principle of this package:
 # reduce optimization problems to fixed point iterations
@@ -39,7 +36,6 @@ function fixedpoint!(f!, x, isfixed)
 end
 # using default stopping criterion
 fixedpoint!(f!, x) = fixedpoint!(f!, x, StoppingCriterion(x))
-
 ########################### Stopping Criterion ##################################
 # abstract type StoppingCriterion{T} end
 struct StoppingCriterion{T, S}
@@ -75,7 +71,10 @@ abstract type Direction{T} <: Update{T} end
 update!(D::Update, x, t::Int) = update!(D, x)
 update!(D::Direction, x) = (x .+= D(x))
 update!(D::Direction, x, t::Int) = (x .+= D(x, t))
+
+# converting a direction to an update
 update!(D::Direction) = (x, t::Int) -> (x .+= D(x, t))
+fixedpoint!(d::Direction, x, isfixed) = fixedpoint!(update!(d), x, isfixed)
 
 function objective end # returns objective function
 objective(d::Direction, x) = d.f(x)
