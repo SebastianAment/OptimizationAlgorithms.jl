@@ -60,6 +60,45 @@ end
 
 ################################################################################
 # TODO: what if this instead had a direction field?
+struct DecreasingStep{T, V, D, A, S} <: Update{T}
+    x::T # storage for value
+    objective::V # value function αξία
+    valdir::D # value and direction κατεύθυνση
+    α::A # last α, has to be 0D array, or armijo is mutable (went with mutable)
+    c::S # coefficient in decreasing rule
+    decrease::S # μείωση factor
+    increase::S # αύξηση factor
+    maxbacktrack::Int
+end
+# function DecreasingStep(x, obj::Function, valdir::Function,
+#             α::S = 1., c = 0., decrease = 3.,
+#             increase = 2., maxbacktrack::Int = 16) where {S<:Real}
+#     # α = fill(α) # creating 0D array
+#     x = fill(zero(eltype(x)), size(x))
+#     DecreasingStep(x, obj, valdir, α, S(c), S(decrease), S(increase), maxbacktrack)
+# end
+
+function DecreasingStep(x, dir::Direction, α::S = 1., c = 1.,
+        decrease = 3., increase = 2., maxbacktrack::Int = 16) where {S<:Real}
+        DecreasingStep(copy(x), objective(dir), valdir(dir),
+                α, S(c), S(decrease), S(increase), maxbacktrack)
+end
+
+function update!(D::DecreasingStep, x)
+    value, direction = D.valdir(x)
+    descent = descent_condition(D.objective, value, direction, D.c)
+    success = linesearch!(D.x, x, D.α, direction, descent, D.maxbacktrack, D.decrease)
+    return success ? (x .= D.x) : x #copy!(x, D.x) : x
+end
+
+# weakest rule, no good theoretical guarantees, but works in practice and is fast
+function descent_condition(objective::Function, value, direction::T,
+                                                        c::Real = 1.) where {T}
+    return descent(α, xn) = (objective(xn) ≤ c * value)
+end
+
+################################################################################
+# TODO: what if this instead had a direction field?
 struct ArmijoStep{T, V, D, G, A, S} <: Update{T}
     x::T # storage for value
     objective::V # value function αξία
@@ -87,8 +126,8 @@ function ArmijoStep(x, dir::Direction,
                     α, S(c), S(decrease), S(increase), maxbacktrack)
 end
 
-function update!(A::ArmijoStep, x, t::Int...)
-    value, direction = A.valdir(x, t...)
+function update!(A::ArmijoStep, x)
+    value, direction = A.valdir(x)
     grad = A.gradient(x)
     armijo = armijo_condition(A.objective, value, direction, grad, A.c)
     success = linesearch!(A.x, x, A.α, direction, armijo, A.maxbacktrack, A.decrease)
@@ -102,44 +141,6 @@ function armijo_condition(objective::Function, value, direction::T, ∇::T,
                                                     c::Real = 1e-4) where {T}
     direction_gradient = dot(direction, ∇) # just to make sure its eager
     return armijo(α, xn) = (objective(xn) ≤ value + α * c * direction_gradient)
-end
-
-################################################################################
-struct DecreasingStep{T, V, D, A, S} <: Update{T}
-    x::T # storage for value
-    objective::V # value function αξία
-    valdir::D # value and direction κατεύθυνση
-    α::A # last α, has to be 0D array, or armijo is mutable (went with mutable)
-    c::S # coefficient in decreasing rule
-    decrease::S # μείωση factor
-    increase::S # αύξηση factor
-    maxbacktrack::Int
-end
-# function DecreasingStep(x, obj::Function, valdir::Function,
-#             α::S = 1., c = 0., decrease = 3.,
-#             increase = 2., maxbacktrack::Int = 16) where {S<:Real}
-#     # α = fill(α) # creating 0D array
-#     x = fill(zero(eltype(x)), size(x))
-#     DecreasingStep(x, obj, valdir, α, S(c), S(decrease), S(increase), maxbacktrack)
-# end
-
-function DecreasingStep(x, dir::Direction, α::S = 1., c = 1.,
-        decrease = 3., increase = 2., maxbacktrack::Int = 16) where {S<:Real}
-        DecreasingStep(copy(x), objective(dir), valdir(dir),
-                α, S(c), S(decrease), S(increase), maxbacktrack)
-end
-
-function update!(D::DecreasingStep, x, t::Int...)
-    value, direction = D.valdir(x, t...)
-    descent = descent_condition(D.objective, value, direction, D.c)
-    success = linesearch!(D.x, x, D.α, direction, descent, D.maxbacktrack, D.decrease)
-    return success ? copy!(x, D.x) : x
-end
-
-# weakest rule, no good theoretical guarantees, but works in practice and is fast
-function descent_condition(objective::Function, value, direction::T,
-                                                        c::Real = 1.) where {T}
-    return descent(α, xn) = (objective(xn) ≤ c * value)
 end
 
 ################################################################################

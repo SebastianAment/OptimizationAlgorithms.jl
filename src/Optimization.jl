@@ -66,7 +66,7 @@ abstract type Direction{T} <: Update{T} end
 (D::Update)(x) = update!(D, x)
 
 # direction functor
-(D::Direction)(x, t::Int) = direction(D, x, t)
+(D::Direction)(x, t::Int) = direction(D, x) # since directions do not depend on time
 (D::Direction)(x) = direction(D, x)
 
 update!(D::Update, x, t::Int) = update!(D, x)
@@ -85,11 +85,11 @@ const value = objective
 
 function direction end # returns direction
 direction(D::Direction, x) = valdir(D, x)[2]
-direction(D::Direction, x, t::Int) = valdir(D, x, t)[2]
+# direction(D::Direction, x, t::Int) = valdir(D, x)[2]
 
 # calculates direction and value at the same time
-valuedirection(D::Direction, x, t::Int) = valdir(D::Direction, x)
-valuedirection(D::Direction) = (x, t) -> valdir(D, x, t)
+# valuedirection(D::Direction, x, t::Int) = valdir(D::Direction, x)
+valuedirection(D::Direction) = x -> valdir(D, x)
 const valdir = valuedirection
 
 ################################################################################

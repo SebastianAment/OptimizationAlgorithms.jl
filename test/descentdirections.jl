@@ -113,7 +113,7 @@ end
         v = (x-μ)'g
         v, -g ./ diag(A)
     end
-    x = randn(n)
+    x = randn(n) + μ # normally distributed around μ
     B = Optimization.CustomDirection(f, valdir, x)
     ε = 1e-6
     fixedpoint!(B, x, StoppingCriterion(x, 1e-2ε))

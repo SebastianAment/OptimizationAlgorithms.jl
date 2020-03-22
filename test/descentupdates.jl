@@ -2,7 +2,7 @@ module TestDescentUpdates
 using Test
 using LinearAlgebra
 using Optimization
-using Optimization: Gradient, ScaledGradient
+using Optimization: Gradient, ScaledGradient, StoppingCriterion, fixedpoint!
 using Optimization: PolyakMomentum, Nesterov, Adam
 using ForwardDiff: gradient
 
@@ -16,12 +16,7 @@ using ForwardDiff: gradient
     G = ScaledGradient(f, x)
     G = PolyakMomentum(G, copy(x), .5)
     ε = 1e-6
-    for t in 1:64
-        G(x)
-        if norm(gradient(f, x)) < ε
-            break
-        end
-    end
+    fixedpoint!(G, x, StoppingCriterion(x, 1e-2ε))
     @test norm(gradient(f, x)) < ε
 end
 
@@ -36,12 +31,7 @@ end
     G = ScaledGradient(f, x)
     G = Nesterov(G, copy(x), 1., .01)
     ε = 1e-6
-    for t in 1:64
-        G(x)
-        if norm(gradient(f, x)) < ε
-            break
-        end
-    end
+    fixedpoint!(G, x, StoppingCriterion(x, 1e-2ε))
     @test norm(gradient(f, x)) < ε
 end
 
