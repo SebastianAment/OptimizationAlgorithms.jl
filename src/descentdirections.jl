@@ -247,9 +247,8 @@ end
 struct CustomDirection{T, F, FD} <: Direction{T}
     f::F # calculates objective value
     valdir::FD # calculates objective value and gradient
-    function CustomDirection(f::F, valdir::FD, x::V) where {T<:Number,
-                                                V<:AbstractArray{<:T}, F, FD}
-        new{V, F, FD}(f, valdir)
+    function CustomDirection(f::F, valdir::FD, x::T) where {T<:AbstractArray, F, FD}
+        new{T, F, FD}(f, valdir)
     end
 end
 valdir(D::CustomDirection, x) = D.valdir(x)

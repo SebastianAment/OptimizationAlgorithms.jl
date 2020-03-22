@@ -76,14 +76,14 @@ function ArmijoStep(x, obj, valdir,
         increase = 2., maxbacktrack::Int = 16) where {S}
     # α = fill(α) # creating 0D array
     x = fill(zero(eltype(x)), size(x))
-    ArmijoStep(x, obj, valdir, grad, α,
+    ArmijoStep(copy(x), obj, valdir, grad, α,
                 S(c), S(decrease), S(increase), maxbacktrack)
 end
 
 function ArmijoStep(x, dir::Direction,
         grad = x->FD.gradient(objective(dir), x), α::S = 1., c = 0.,
         decrease = 3., increase = 2., maxbacktrack::Int = 16) where {S}
-        ArmijoStep(x, objective(dir), valdir(dir), grad,
+        ArmijoStep(copy(x), objective(dir), valdir(dir), grad,
                     α, S(c), S(decrease), S(increase), maxbacktrack)
 end
 
@@ -125,7 +125,7 @@ end
 
 function DecreasingStep(x, dir::Direction, α::S = 1., c = 1.,
         decrease = 3., increase = 2., maxbacktrack::Int = 16) where {S<:Real}
-        DecreasingStep(x, objective(dir), valdir(dir),
+        DecreasingStep(copy(x), objective(dir), valdir(dir),
                 α, S(c), S(decrease), S(increase), maxbacktrack)
 end
 
