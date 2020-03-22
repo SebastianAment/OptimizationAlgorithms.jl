@@ -7,7 +7,8 @@ using LinearAlgebraExtensions: difference
 # define euclidean metric
 const euclidean = Metrics.EuclideanMetric()
 
-# TODO: all directions / updates seem to be time independent, except ADAM
+# TODO: all directions are time-indpendent, except ADAM if interpreted as direction
+# cg is also behaves differently for first iteration
 # TODO: projections
 # TODO: Frank-Wolfe algorithm for linearly constrained convex problems
 # TODO: Lagrange multiplier methods

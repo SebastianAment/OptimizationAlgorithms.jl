@@ -86,7 +86,6 @@ end
 
     # higher-dimensional non-quadratic
     f(x) = 1/2*(x-μ)'A*(x-μ) - sum(x->log(abs2(x)), x)
-
     x = randn(n)
     B = Optimization.BFGS(f, x)
     ε = 1e-6
@@ -114,7 +113,6 @@ end
         v = (x-μ)'g
         v, -g ./ diag(A)
     end
-    valdir(x, t) = valdir(x)
     x = randn(n)
     B = Optimization.CustomDirection(f, valdir, x)
     ε = 1e-6

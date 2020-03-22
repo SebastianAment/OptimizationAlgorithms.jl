@@ -23,6 +23,7 @@ struct ConjugateGradient{T, M, V, R} <: Update{T}
         new{T, M, V, typeof(r)}(A, b, d, Ad, r)
     end
 end
+const CG = ConjugateGradient
 # no allocations :)
 function update!(C::ConjugateGradient, x::AbstractVector, t::Int)
     if t > length(x) # algorithm does not have guarantees after n iterations

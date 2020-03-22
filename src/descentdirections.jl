@@ -253,7 +253,6 @@ struct CustomDirection{T, F, FD} <: Direction{T}
     end
 end
 valdir(D::CustomDirection, x) = D.valdir(x)
-valdir(D::CustomDirection, x, t::Int) = D.valdir(x, t)
 
 # valgrad(f, x) = f(x), -gradient(f, x)
 # Gradient(f, x) = CustomDirection(f, valgrad, x)
