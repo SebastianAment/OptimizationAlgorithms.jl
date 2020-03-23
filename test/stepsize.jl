@@ -14,7 +14,7 @@ f(x) = (x-μ)'A*(x-μ)
 @testset "descent" begin
     x = randn(n)
     G = Optimization.Gradient(f, x)
-    U = Optimization.DecreasingStep(x, G)
+    U = Optimization.DecreasingStep(G, x)
     ε = 1e-6
     fixedpoint!(U, x, StoppingCriterion(x, 1e-2ε))
     @test norm(gradient(f, x)) < ε
@@ -23,7 +23,7 @@ end
 @testset "armijo" begin
     x = randn(n)
     G = Optimization.Gradient(f, x)
-    U = Optimization.ArmijoStep(x, G)
+    U = Optimization.ArmijoStep(G, x)
     ε = 1e-6
     fixedpoint!(U, x, StoppingCriterion(x, 1e-2ε))
     @test norm(gradient(f, x)) < ε

@@ -31,64 +31,35 @@ function linesearch!(xn::T, x::T, α::Real, direction::T, searchcondition,
     return false
 end
 
-# could also abstract away step update:
-# backtrack(α, decrease) = α * decrease
-# backtrack(decrease) = α -> backtrackstep(α, decrease)
-# integral control?
-# struct LineSearch{T, D<:Direction, S, C} <: Update{T}
-#     x::T # intermediate storage for value
-#     direction::D
-#     # stepupdate::S
-#     decrease::S
-#     searchcondition::C
-#     maxbacktrack::Int
-# end
-#
-# function (L::LineSearch)(x)
-#     d = direction(x)
-#     # cond = L.searchcondition(x, t)
-#     linesearch!(L.x, x, d, L.searchcondition, L.maxbacktrack, L.decrease) #L.stepupdate)
-# end
-# # needs to compute function which returns searchcondition for each x
-# # function armijo(d::Direction)
-# #     value, direction = A.valdir(x, t...)
-# #     grad = A.gradient(x)
-# #     cond = armijo_condition(A.objective, value, direction, grad, A.c)
-# #     success = linesearch!(A.x, x, A.α, direction, armijo, A.maxbacktrack, A.decrease)
-# #     return success ? copy!(x, A.x) : x
-# # end
-
 ################################################################################
-# TODO: what if this instead had a direction field?
-struct DecreasingStep{T, V, D, A, S} <: Update{T}
+struct DecreasingStep{T, D, A, S} <: Update{T}
+    direction::D # αξία και κατεύθυνση
     x::T # storage for value
-    objective::V # value function αξία
-    valdir::D # value and direction κατεύθυνση
     α::A # last α, has to be 0D array, or armijo is mutable (went with mutable)
     c::S # coefficient in decreasing rule
     decrease::S # μείωση factor
-    increase::S # αύξηση factor
+    # increase::S # αύξηση factor
     maxbacktrack::Int
+    function DecreasingStep(dir::D, x::T, α::S = 1., c = 1., decrease = 3.,
+                            maxbacktrack::Int = 16) where {T, D<:Direction, S}
+        # makes sure that we use a copy of x
+        new{T, D, S, S}(dir, copy(x), α, S(c), S(decrease), maxbacktrack)
+    end
 end
-# function DecreasingStep(x, obj::Function, valdir::Function,
+# function DecreasingStep(obj::Function, valdir::Function, x,
 #             α::S = 1., c = 0., decrease = 3.,
 #             increase = 2., maxbacktrack::Int = 16) where {S<:Real}
-#     # α = fill(α) # creating 0D array
 #     x = fill(zero(eltype(x)), size(x))
-#     DecreasingStep(x, obj, valdir, α, S(c), S(decrease), S(increase), maxbacktrack)
+#     D = CustomDirection(obj, valdir, x)
+#     DecreasingStep(D, copy(x), α, S(c), S(decrease), S(increase), maxbacktrack)
 # end
 
-function DecreasingStep(x, dir::Direction, α::S = 1., c = 1.,
-        decrease = 3., increase = 2., maxbacktrack::Int = 16) where {S<:Real}
-        DecreasingStep(copy(x), objective(dir), valdir(dir),
-                α, S(c), S(decrease), S(increase), maxbacktrack)
-end
-
+objective(D::DecreasingStep) = objective(D.direction)
 function update!(D::DecreasingStep, x)
-    value, direction = D.valdir(x)
-    descent = descent_condition(D.objective, value, direction, D.c)
-    success = linesearch!(D.x, x, D.α, direction, descent, D.maxbacktrack, D.decrease)
-    return success ? (x .= D.x) : x #copy!(x, D.x) : x
+    val, dir = valdir(D.direction, x)
+    descent = descent_condition(objective(D), val, dir, D.c)
+    success = linesearch!(D.x, x, D.α, dir, descent, D.maxbacktrack, D.decrease)
+    return success ? copy!(x, D.x) : x
 end
 
 # weakest rule, no good theoretical guarantees, but works in practice and is fast
@@ -99,38 +70,33 @@ end
 
 ################################################################################
 # TODO: what if this instead had a direction field?
-struct ArmijoStep{T, V, D, G, A, S} <: Update{T}
+struct ArmijoStep{T, D, G, A, S} <: Update{T}
+    direction::D # αξία και κατεύθυνση
     x::T # storage for value
-    objective::V # value function αξία
-    valdir::D # value and direction κατεύθυνση
     gradient::G # need gradient for Armijo rule
     α::A # last α, has to be 0D array, or armijo is mutable (went with mutable)
     c::S # coefficient in Armijo rule
     decrease::S # μείωση factor
-    increase::S # αύξηση factor
     maxbacktrack::Int
+    function ArmijoStep(dir::D, x::T, grad::G = x->FD.gradient(objective(dir), x),
+            α::S = 1., c = 0., decrease = 3., maxbacktrack::Int = 16) where {T, D, G, S}
+            new{T, D, G, S, S}(dir, copy(x), grad, α, S(c), S(decrease), maxbacktrack)
+    end
 end
-function ArmijoStep(x, obj, valdir,
-        grad = x->FD.gradient(obj, x), α::S = 1., c = 0., decrease = 3.,
-        increase = 2., maxbacktrack::Int = 16) where {S}
-    # α = fill(α) # creating 0D array
-    x = fill(zero(eltype(x)), size(x))
-    ArmijoStep(copy(x), obj, valdir, grad, α,
-                S(c), S(decrease), S(increase), maxbacktrack)
-end
-
-function ArmijoStep(x, dir::Direction,
-        grad = x->FD.gradient(objective(dir), x), α::S = 1., c = 0.,
-        decrease = 3., increase = 2., maxbacktrack::Int = 16) where {S}
-        ArmijoStep(copy(x), objective(dir), valdir(dir), grad,
-                    α, S(c), S(decrease), S(increase), maxbacktrack)
-end
-
+# function ArmijoStep(x, obj, valdir,
+#         grad = x->FD.gradient(obj, x), α::S = 1., c = 0., decrease = 3.,
+#         increase = 2., maxbacktrack::Int = 16) where {S}
+#     # α = fill(α) # creating 0D array
+#     x = fill(zero(eltype(x)), size(x))
+#     ArmijoStep(copy(x), obj, valdir, grad, α,
+#                 S(c), S(decrease), S(increase), maxbacktrack)
+# end
+objective(A::ArmijoStep) = objective(A.direction)
 function update!(A::ArmijoStep, x)
-    value, direction = A.valdir(x)
+    val, dir = valdir(A.direction, x)
     grad = A.gradient(x)
-    armijo = armijo_condition(A.objective, value, direction, grad, A.c)
-    success = linesearch!(A.x, x, A.α, direction, armijo, A.maxbacktrack, A.decrease)
+    armijo = armijo_condition(objective(A), val, dir, grad, A.c)
+    success = linesearch!(A.x, x, A.α, dir, armijo, A.maxbacktrack, A.decrease)
     return success ? copy!(x, A.x) : x
 end
 
@@ -142,6 +108,43 @@ function armijo_condition(objective::Function, value, direction::T, ∇::T,
     direction_gradient = dot(direction, ∇) # just to make sure its eager
     return armijo(α, xn) = (objective(xn) ≤ value + α * c * direction_gradient)
 end
+
+################################################################################
+# could also abstract away step update:
+# backtrack(α, decrease) = α * decrease
+# backtrack(decrease) = α -> backtrackstep(α, decrease)
+# integral control?
+# AKA InexactLinesearch, could have separate type for exact
+# struct LineSearch{T, D<:Direction, S, C} <: Update{T}
+#     direction::D
+#     x::T # intermediate storage for value
+#     # stepupdate::S
+#     searchcondition::C
+#     decrease::S
+#     maxbacktrack::Int
+#     function LineSearch(dir::D, x::T, α::S = 1., c = 1., decrease = 3.,
+#                     maxbacktrack::Int = 16) where {T, D<:Direction, S}
+#         # makes sure that we use a copy of x
+#         new{T, D, S, C}(dir, copy(x), S(decrease), maxbacktrack)
+#     end
+# end
+# function update!(L::LineSearch, x)
+#     val, dir = valdir(L.direction, x)
+#
+#     d = L.direction(x)
+#     # cond = L.searchcondition(x, t)
+#     descent = L.search_condition(objective(D), val, dir, D.c)
+#     success = linesearch!(L.x, x, dir, L.searchcondition, L.maxbacktrack, L.decrease) #L.stepupdate)
+#     return success ? copy!(x, D.x) : x
+# end
+# needs to compute function which returns searchcondition for each x
+# function armijo(d::Direction)
+#     value, direction = A.valdir(x, t...)
+#     grad = A.gradient(x)
+#     cond = armijo_condition(A.objective, value, direction, grad, A.c)
+#     success = linesearch!(A.x, x, A.α, direction, armijo, A.maxbacktrack, A.decrease)
+#     return success ? copy!(x, A.x) : x
+# end
 
 ################################################################################
 # strongest condition, theoretical guarantees

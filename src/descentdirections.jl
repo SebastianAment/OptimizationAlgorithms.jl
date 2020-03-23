@@ -132,6 +132,7 @@ struct BFGS{T, D, M, X} <: Direction{T}
 end
 BFGS(f::Function, x) = BFGS(Gradient(f, x), x)
 BFGS(f::Function, ∇::Function, x) = BFGS(CustomDirection(f, x->(f(x), -∇(x)), x), x)
+objective(L::BFGS) = objective(L.direction)
 
 function valdir(N::BFGS, x::AbstractVector)
     value, ∇ = valdir(N.direction, x) # this should maybe be valdir?
@@ -191,6 +192,7 @@ LBFGS(f::Function, x, m::Int) = LBFGS(Gradient(f, x), x, m)
 function LBFGS(f::Function, ∇::Function, x, m::Int)
     LBFGS(CustomDirection(f, x->(f(x), -∇(x)), x), x, m)
 end
+objective(L::LBFGS) = objective(L.direction)
 
 function valdir(N::LBFGS, x::AbstractVector)
     value, ∇ = valdir(N.direction, x)
