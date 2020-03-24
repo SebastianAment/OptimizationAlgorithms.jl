@@ -111,9 +111,10 @@ end
     function valdir(x::AbstractVector) # shows how evaluation and gradient computation can be pooled
         g = A*(x-μ)
         v = (x-μ)'g
-        v, -g ./ diag(A)
+        g .*= -g'g / (g'A*g) # optimal stepsize for quadratic problems
+        v, g
     end
-    x = randn(n) + μ # normally distributed around μ
+    x = 100randn(n) + μ # normally distributed around μ
     B = Optimization.CustomDirection(f, valdir, x)
     ε = 1e-6
     fixedpoint!(B, x, StoppingCriterion(x, 1e-2ε))

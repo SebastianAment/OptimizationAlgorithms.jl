@@ -1,21 +1,5 @@
 # TODO: quasi-exact line search via interpolation, GPs
-############################ Step Size Selectors ###############################
-# generalizes search for an α such that (x - α * direction) leads to minimizer
-# struct ConstantStep{T, D<:Direction} <: Direction{T}
-#     d::D
-#     α::T
-# end
-# # decide if I want to represent the multiplication lazily
-# # direction(C::ConstantStep) = C.α * direction(C.d) # introduces temporary
-# function direction!(C::ConstantStep, x)
-#     direction!(C.d, x) # update direction vector
-#     direction(C.d) .*= C.α # multiply direction with step-size
-# end
-# function update!(C::ConstantStep, x::AbstractVector)
-#     direction!(C.d, x) # update direction vector
-#     x .+= C.α .* direction(C.d)
-# end
-
+# TODO: g .*= -g'g / (g'A*g) # optimal stepsize for quadratic problems
 ################################################################################
 # inputs: searchcondition function, i.e. Armijo, Wolfe
 # stepupdate is step size updating policy
@@ -30,7 +14,6 @@ function linesearch!(xn::T, x::T, α::Real, direction::T, searchcondition,
     end
     return false
 end
-
 ################################################################################
 struct DecreasingStep{T, D, A, S} <: Update{T}
     direction::D # αξία και κατεύθυνση
@@ -174,6 +157,23 @@ end
 # function WolfeStep(d::D, c::T = .99, α = 1., decrease = 7., increase = 2.,
 #                             maxbacktrack::Int = 16) where {T, D<:Direction}
 #     ArmijoStep{T, D}(d, c, T(α), T(decrease), T(increase), maxbacktrack)
+# end
+
+############################ Step Size Selectors ###############################
+# generalizes search for an α such that (x - α * direction) leads to minimizer
+# struct ConstantStep{T, D<:Direction} <: Direction{T}
+#     d::D
+#     α::T
+# end
+# # decide if I want to represent the multiplication lazily
+# # direction(C::ConstantStep) = C.α * direction(C.d) # introduces temporary
+# function direction!(C::ConstantStep, x)
+#     direction!(C.d, x) # update direction vector
+#     direction(C.d) .*= C.α # multiply direction with step-size
+# end
+# function update!(C::ConstantStep, x::AbstractVector)
+#     direction!(C.d, x) # update direction vector
+#     x .+= C.α .* direction(C.d)
 # end
 
 ################################################################################

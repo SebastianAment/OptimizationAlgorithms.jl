@@ -35,22 +35,27 @@ function fixedpoint!(f!, x, isfixed)
     end
     x, t
 end
+
 # using default stopping criterion
 fixedpoint!(f!, x) = fixedpoint!(f!, x, StoppingCriterion(x))
+
 ########################### Stopping Criterion ##################################
 # abstract type StoppingCriterion{T} end
+# TODO: add minimum relative change
 struct StoppingCriterion{T, S}
     x::T # holds last value of parameters
     δ::S # minimum absolute change in parameters x for termination
+    # δᵣ::S # minimum relative change in function value
     maxiter::Int # maximum iterations
     # ε::T # minimum absolute change in function f for termination
     # y::T # holds last function value
     function StoppingCriterion(x, δ::Real = 1e-6, maxiter::Int = 128)
-        new{typeof(x), typeof(δ)}(fill(Inf, size(x)), δ, maxiter)
+        new{typeof(x), typeof(δ)}(fill(Inf, size(x)), δ, maxiter) #  δᵣ = δₐ,
     end
 end
 function (T::StoppingCriterion)(x, t)
-    val = euclidean(x, T.x) < T.δ || t > T.maxiter # || abs(y - T.y) < ε
+    # δᵣ = (y - T.y) / y # relative change in function value
+    val = euclidean(x, T.x) < T.δ || t > T.maxiter #|| δᵣ < T.δᵣ
     T.x .= x
     return val
 end
@@ -104,6 +109,19 @@ include("stepsize.jl")
 include("submodular.jl")
 
 end # Optimization
+
+# TODO: replace fixedpoint! with optimize!:
+# function optimize!(f!::Update, x, isfixed, maxiter::Int = 128)
+#     t = 1
+#     for i in 1:maxiter
+#         y = f!(x, t)
+#         t += 1
+#         if !isfixed(x, y, t)
+#             break
+#         end
+#     end
+#     x, t
+# end
 
 ################################################################################
 # to make a descent direction out of a ascent direction

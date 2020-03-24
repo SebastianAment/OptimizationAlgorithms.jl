@@ -119,7 +119,8 @@ struct BFGS{T, D, M, X} <: Direction{T}
     d::X # direction
     y::X # pre-allocate temporary storage
     s::X
-    function BFGS(dir::D, x::X) where {T, D<:Direction, X<:AbstractVector{T}}
+    check::Bool # check strong convexity
+    function BFGS(dir::D, x::X; check::Bool = true) where {T, D<:Direction, X<:AbstractVector{T}}
         H⁻¹ = Matrix((1e-6I)(length(x)))
         ∇ = -dir(x)
         d = -H⁻¹*∇ # TODO: descent in deterministic case should be chosen with line search
@@ -139,18 +140,20 @@ function valdir(N::BFGS, x::AbstractVector)
     ∇ .*= -1 # since we get the direction, (negative gradient)
     @. N.s = x - N.x; copy!(N.x, x) # update s and save current x
     @. N.y = ∇ - N.∇; copy!(N.∇, ∇) # if f is stochastic, have to be careful about consistency here
-    bfgs_update!(N.H⁻¹, N.s, N.y)
+    bfgs_update!(N.H⁻¹, N.s, N.y, N.check)
     mul!(N.d, N.H⁻¹, ∇)
     N.d .*= -1
     return value, N.d
 end
 # updates inverse hessian with bfgs strategy
 # could also use recursive algorithm here to reduce memory footprint (see below)
-function bfgs_update!(H⁻¹::AbstractMatrix, s::AbstractVector, y::AbstractVector)
-    if s'y > 0 # function strongly convex -> update inverse Hessian
-        ρ = 1/(s'y)
+function bfgs_update!(H⁻¹::AbstractMatrix, s::AbstractVector, y::AbstractVector, check::Bool = true)
+    ρ = 1/(s'y)
+    if ρ > 0 # function strongly convex -> update inverse Hessian
         A = (I - ρ*s*y') # TODO: pre-allocate?
         H⁻¹ .= A * H⁻¹ * A' .+ ρ*s*s' # TODO: woodbury?
+    elseif check
+        println("Warning: Skipping BFGS update because function is not strongly convex.")
     end
     return H⁻¹
 end
@@ -170,7 +173,9 @@ struct LBFGS{T, D, X, V, A} <: Direction{T}
     y::V # previous m gradient differences
     m::Int # maximum recursion depth
     α::A
-    function LBFGS(dir::D, x::X, m::Int) where {T, D<:Direction, X<:AbstractVector{T}}
+    check::Bool
+    function LBFGS(dir::D, x::X, m::Int; check::Bool = true) where {T,
+                                            D<:Direction, X<:AbstractVector{T}}
         m ≥ 1 || error("recursion depth m cannot be smaller than 1")
         n = length(x)
         s = CircularBuffer{X}(m) # TODO: elements could be static arrays
@@ -185,7 +190,7 @@ struct LBFGS{T, D, X, V, A} <: Direction{T}
         d = -1e-6*∇
         x .+= d # TODO: initial stepsize selection?
         α = zeros(eltype(x), m)
-        new{T, D, X, V, typeof(α)}(dir, xold, ∇, d, s, y, m, α)
+        new{T, D, X, V, typeof(α)}(dir, xold, ∇, d, s, y, m, α, check)
     end
 end
 LBFGS(f::Function, x, m::Int) = LBFGS(Gradient(f, x), x, m)
@@ -198,11 +203,18 @@ function valdir(N::LBFGS, x::AbstractVector)
     value, ∇ = valdir(N.direction, x)
     copy!(N.d, ∇)
     ∇ .*= -1 # since we get the direction, (negative gradient)
-    copyfirst!(N.s, difference(x, N.x)); copy!(N.x, x) # difference to avoid temporary
-    copyfirst!(N.y, difference(∇, N.∇)); copy!(N.∇, ∇)
-    t = length(N.s)
-    α = t < N.m ? view(N.α, 1:t) : N.α # limit recursion if we haven't stepped enough
-    lbfgs_recursion!(N.d, N.s, N.y, α)
+    s = difference(x, N.x) # difference to avoid temporary
+    y = difference(∇, N.∇)
+    ρ = 1/(s'y)
+    if ρ > 0 # only update inverse Hessian approximation if ρ > 0, like in BFGS!
+        copyfirst!(N.s, s); copy!(N.x, x)
+        copyfirst!(N.y, y); copy!(N.∇, ∇)
+        t = length(N.s)
+        α = t < N.m ? view(N.α, 1:t) : N.α # limit recursion if we haven't stepped enough
+        lbfgs_recursion!(N.d, N.s, N.y, α)
+    elseif N.check
+        println("Warning: Skipping LBFGS update because function is not strongly convex.")
+    end
     return value, N.d
 end
 
