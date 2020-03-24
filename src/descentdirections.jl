@@ -155,7 +155,7 @@ function bfgs_update!(H⁻¹::AbstractMatrix, s::AbstractVector, y::AbstractVect
     if ρ > 0 # function strongly convex -> update inverse Hessian
         mul!(Hy, H⁻¹, y)
         d = (ρ * dot(y, Hy) + 1) # rank 1
-        @. H⁻¹ += ρ * (d * (s*s') - (s*Hy') - (Hy*s'))
+        @. H⁻¹ += ρ*(d*s*s' - s*Hy' - Hy*s')
     elseif check
         println("Warning: Skipping BFGS update because function is not strongly convex.")
     end
