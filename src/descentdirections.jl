@@ -117,8 +117,9 @@ struct BFGS{T, D, M, X} <: Direction{T}
     x::X # old x
     ∇::X # old gradient
     d::X # direction
-    y::X # pre-allocate temporary storage
     s::X
+    y::X # pre-allocate temporary storage
+    Hy::X # storage for H⁻¹*y in bfgs_update, can alias with d
     check::Bool # check strong convexity
     function BFGS(dir::D, x::X; check::Bool = true) where {T, D<:Direction, X<:AbstractVector{T}}
         H⁻¹ = Matrix((1e-6I)(length(x)))
@@ -128,7 +129,8 @@ struct BFGS{T, D, M, X} <: Direction{T}
         x .+= d
         s, y = (x - xold), (-dir(x) - ∇)
         H⁻¹[diagind(H⁻¹)] .= (s'y) / sum(abs2, y) # takes care of scaling issues
-        new{T, D, typeof(H⁻¹), X}(dir, H⁻¹, xold, ∇, d, s, y)
+        Hy = d # we can alias memory here
+        new{T, D, typeof(H⁻¹), X}(dir, H⁻¹, xold, ∇, d, s, y, Hy, check)
     end
 end
 BFGS(f::Function, x) = BFGS(Gradient(f, x), x)
@@ -140,23 +142,28 @@ function valdir(N::BFGS, x::AbstractVector)
     ∇ .*= -1 # since we get the direction, (negative gradient)
     @. N.s = x - N.x; copy!(N.x, x) # update s and save current x
     @. N.y = ∇ - N.∇; copy!(N.∇, ∇) # if f is stochastic, have to be careful about consistency here
-    bfgs_update!(N.H⁻¹, N.s, N.y, N.check)
+    bfgs_update!(N.H⁻¹, N.s, N.y, N.Hy, N.check)
     mul!(N.d, N.H⁻¹, ∇)
     N.d .*= -1
     return value, N.d
 end
 # updates inverse hessian with bfgs strategy
 # could also use recursive algorithm here to reduce memory footprint (see below)
-function bfgs_update!(H⁻¹::AbstractMatrix, s::AbstractVector, y::AbstractVector, check::Bool = true)
+function bfgs_update!(H⁻¹::AbstractMatrix, s::AbstractVector, y::AbstractVector,
+                    Hy::AbstractVector = similar(y), check::Bool = true)
     ρ = 1/(s'y)
     if ρ > 0 # function strongly convex -> update inverse Hessian
-        A = (I - ρ*s*y') # TODO: pre-allocate?
-        H⁻¹ .= A * H⁻¹ * A' .+ ρ*s*s' # TODO: woodbury?
+        mul!(Hy, H⁻¹, y)
+        d = (ρ * dot(y, Hy) + 1) # rank 1
+        @. H⁻¹ += ρ * (d * (s*s') - (s*Hy') - (Hy*s'))
     elseif check
         println("Warning: Skipping BFGS update because function is not strongly convex.")
     end
     return H⁻¹
 end
+# old update (allocating)
+# A = (I - ρ*s*y') # TODO: pre-allocate?
+# H⁻¹ .= A * H⁻¹ * A' .+ ρ*s*s' # TODO: woodbury?
 # else # re-initialize inverse hessian to diagonal, if not strongly convex
 #     N.H⁻¹ .= I(length(x))
 # BFGS update corresponds to updating the Hessian as: (use for woodbury)
