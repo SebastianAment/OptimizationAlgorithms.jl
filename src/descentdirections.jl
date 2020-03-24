@@ -207,14 +207,14 @@ function valdir(N::LBFGS, x::AbstractVector)
     y = difference(∇, N.∇)
     ρ = 1/(s'y)
     if ρ > 0 # only update inverse Hessian approximation if ρ > 0, like in BFGS!
-        copyfirst!(N.s, s); copy!(N.x, x)
+        copyfirst!(N.s, s); copy!(N.x, x) # lbfgs_update
         copyfirst!(N.y, y); copy!(N.∇, ∇)
-        t = length(N.s)
-        α = t < N.m ? view(N.α, 1:t) : N.α # limit recursion if we haven't stepped enough
-        lbfgs_recursion!(N.d, N.s, N.y, α)
     elseif N.check
         println("Warning: Skipping LBFGS update because function is not strongly convex.")
     end
+    t = length(N.s)
+    α = t < N.m ? view(N.α, 1:t) : N.α # limit recursion if we haven't stepped enough
+    lbfgs_recursion!(N.d, N.s, N.y, α)
     return value, N.d
 end
 
