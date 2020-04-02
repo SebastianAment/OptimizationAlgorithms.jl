@@ -11,6 +11,7 @@ struct SBL{T, AT, BT, GT} <: Update{T}
     AΣb::BT
     Γ::GT
     # B # pre-allocate
+    # Σ::ST
     function SBL(A::AbstractMatrix, b::AbstractVector, Σ::AbstractMatOrUni,
                 Γ::Diagonal = (1.0I)(size(A, 2)))
         AΣ = A'inverse(Σ)
@@ -41,3 +42,75 @@ end
 # updating noise variance (if scalar)
 # B⁻¹ = inverse(B)
 # σ² = sum(abs2, b-A*x) / sum(i->B[i]/Γ[i], diagind(Γ)) # could replace with euclidean norm
+
+# TODO: greedy marginal likelihood optimization
+# using SparseArrays
+# function greedy_sbl(A, x::AbstractVector, y, σ)
+#     n, m = size(A)
+#     # initialization
+#     i = 1
+#     x[i] = 1 # or something better
+#     α = fill(Inf, m)
+#     a2 = sum(abs2, A[:,i])
+#     α[i] = a2 / (dot(A[:,i], y)^2 / a2 - σ^2)
+#     isactive = .!isinf.(α) # active basis patterns
+#
+#     Σ = σ^2*Ι(length(y))
+#     B = inv(Σ)
+#     ind = i
+#     Φ = @view A[:, isactive]
+#     # AΣ = A'inverse(Σ)
+#     for i in 1:maxiter
+#         P = inverse(Φ'inverse(Σ)*Φ + Diagonal(α[isactive])) # posterior covariance
+#         P = factorize(P)
+#         update_sq!(s, q, A, B, Φ, P, y)
+#         update_α!(α, s, q)
+#         @. isactive = !isinf(α) # active basis patterns
+#     end
+#     x = P * (Φ' * (B * y))
+#     return x
+# end
+#
+# # both updates could work on a single basis k
+# # updates set of active basis functions
+# # greedy strategy: chooses update which increases marginal likelihood most
+# function update_α!(α, s, q)
+#     δ = zero(α)
+#     for k in eachindex(α)
+#         if α[k] == Inf && s[k] < q[k]^2 # out of model and high quality factor
+#             δ[k] = (q[k]^2 - s[k]) / s[k] + log(s[k]) - 2log(q[k]) # add k
+#         elseif α[k] < Inf && q[k]^2 ≤ s[k] # in model but not high enough quality
+#             δ[k] = q[k]^2 / (s[k] - α[k]) - log(1 - (s[k] / a[k])) # delete k
+#         else # α re-estimation
+#             β = s[k]^2 / (q[k]^2 - s[k])
+#             d =  1/β - 1/α[k]
+#             δ[k] = q[k]^2 / (s[k] + 1/d) - log(1 + s[k]*d)
+#         end
+#     end
+#     k = argmax(δ)
+#     α[k] = optimal_α(s[k], q[k])
+#     return α
+# end
+# optimal_α(s::Real, q::Real) = (s < q^2) ? (s^2 / (q^2 - s)) : Inf
+#
+# # updates the sparsity and quality factors s and q
+# # could be parallelized
+# # TODO: should have separate update if B has not changed since last update
+# # (see Tipping 2003, Appendix)
+# function update_sq!(s, q, A, B, Φ, P, y, α)
+#     # W = Woodbury(B, BΦ', P, BΦ, -1.) # potentially useful
+#     By = B*y
+#     m = size(A, 2)
+#     for k in 1:m
+#         φ = view(A, :, k) # kth basis function
+#         Bφ = B*φ # TODO: mul!, and could collapse into single temporary vector
+#         ΦBφ = Φ*Bφ
+#         s[k] = dot(φ, Bφ) - dot(ΦBφ, P, ΦBφ)
+#         q[k] = dot(φ, By) - dot(ΦBφ, P, By)
+#         if α[k] < Inf
+#             s[k] = α[k]*s[k] / (α[k]-s[k]) # equation (23) in Tipping 2003
+#             q[k] = α[k]*q[k] / (α[k]-s[k])
+#         end
+#     end
+#     return s, q
+# end

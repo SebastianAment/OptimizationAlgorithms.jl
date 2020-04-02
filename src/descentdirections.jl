@@ -121,16 +121,19 @@ struct BFGS{T, D, M, X} <: Direction{T}
     y::X # pre-allocate temporary storage
     Hy::X # storage for H⁻¹*y in bfgs_update, can alias with d
     check::Bool # check strong convexity
-    function BFGS(dir::D, x::X; check::Bool = true) where {T, D<:Direction, X<:AbstractVector{T}}
-        H⁻¹ = Matrix((1e-6I)(length(x)))
-        ∇ = -dir(x)
-        d = -H⁻¹*∇ # TODO: descent in deterministic case should be chosen with line search
+    function BFGS(dir::Direction, x::AbstractVector; check::Bool = true)
+        n = length(x)
+        H⁻¹ = zeros(eltype(x), (n, n))
+        ∇ = -dir(x) # recording initial gradient
+        D = DecreasingStep(dir, x) # first step is chosen with linesearch and gradient D only
         xold = copy(x)
-        x .+= d
-        s, y = (x - xold), (-dir(x) - ∇)
+        update!(D, x) # updates x
+        s, y = (x - xold), (-dir(x) -∇)
+        d = copy(s)         # d = -H⁻¹*∇
         H⁻¹[diagind(H⁻¹)] .= (s'y) / sum(abs2, y) # takes care of scaling issues
         Hy = d # we can alias memory here
-        new{T, D, typeof(H⁻¹), X}(dir, H⁻¹, xold, ∇, d, s, y, Hy, check)
+        T, X = eltype(x), typeof(x)
+        new{T, typeof(dir), typeof(H⁻¹), X}(dir, H⁻¹, xold, ∇, d, s, y, Hy, check)
     end
 end
 BFGS(f::Function, x) = BFGS(Gradient(f, x), x)
