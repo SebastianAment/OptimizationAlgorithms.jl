@@ -2,12 +2,14 @@ module Optimization
 
 using LinearAlgebra
 using Metrics
-using LinearAlgebraExtensions: difference
+using LinearAlgebraExtensions: difference, LazyDifference
 
 # define euclidean metric
 const euclidean = Metrics.EuclideanMetric()
 
+# TODO: pretty-print of statistics of optimization run (number of steps, objective function history, etc.)
 # TODO: all directions are time-indpendent, except ADAM if interpreted as direction
+# could be remedied, if we add an ADAM stepsize, which is time-dependent
 # cg is also behaves differently for first iteration
 # TODO: projections
 # TODO: Frank-Wolfe algorithm for linearly constrained convex problems

@@ -1,8 +1,13 @@
 ################################################################################
-using DataStructures: CircularBuffer
+# returns dense idenity matrix of eltype T, used in BFGS
+identity(T::Type, n::Int) = Matrix(one(T) * I(n))
+identity(x::AbstractVecOrMat) = identity(eltype(x), size(x, 1))
 
+################################################################################
+using DataStructures: CircularBuffer
 # convenience for circular buffer
 # does in place copy of x in front of buffer, important if cb is buffer of arrays
+# used in LBFGS
 function copyfirst!(cb::CircularBuffer, x)
     cb.first = (cb.first == 1 ? cb.capacity : cb.first - 1)
     if length(cb) < cb.capacity
@@ -13,6 +18,7 @@ end
 
 # TODO: make negative shifts efficient
 # TODO: if shifts > c.length ÷ 2,
+# used in ConjugateGradient
 function Base.circshift!(cb::CircularBuffer, shifts::Int = 1)
     shifts = mod(shifts, cb.length) # since identity if shifts = cb.length
     if shifts > 0

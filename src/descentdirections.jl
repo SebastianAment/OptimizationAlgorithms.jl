@@ -110,8 +110,7 @@ end
 
 ################################################################################
 # Broyden-Fletcher-Goldfarb-Shanno algorithm
-# TODO: move first iteration into constructor, and so too with LBFGS
-struct BFGS{T, D, M, X} <: Direction{T}
+struct BFGS{T, D, M, X<:AbstractVector{T}} <: Direction{T}
     direction::D
     H⁻¹::M # approximation to inverse Hessian
     x::X # old x
@@ -121,23 +120,25 @@ struct BFGS{T, D, M, X} <: Direction{T}
     y::X # pre-allocate temporary storage
     Hy::X # storage for H⁻¹*y in bfgs_update, can alias with d
     check::Bool # check strong convexity
-    function BFGS(dir::Direction, x::AbstractVector; check::Bool = true)
-        n = length(x)
-        H⁻¹ = zeros(eltype(x), (n, n))
-        ∇ = -dir(x) # recording initial gradient
-        D = DecreasingStep(dir, x) # first step is chosen with linesearch and gradient D only
-        xold = copy(x)
-        update!(D, x) # updates x
-        s, y = (x - xold), (-dir(x) -∇)
-        d = copy(s)         # d = -H⁻¹*∇
-        H⁻¹[diagind(H⁻¹)] .= (s'y) / sum(abs2, y) # takes care of scaling issues
-        Hy = d # we can alias memory here
-        T, X = eltype(x), typeof(x)
-        new{T, typeof(dir), typeof(H⁻¹), X}(dir, H⁻¹, xold, ∇, d, s, y, Hy, check)
-    end
 end
-BFGS(f::Function, x) = BFGS(Gradient(f, x), x)
-BFGS(f::Function, ∇::Function, x) = BFGS(CustomDirection(f, x->(f(x), -∇(x)), x), x)
+
+function BFGS(dir::Direction, x::AbstractVector,
+            H⁻¹::AbstractMatrix = identity(x);
+            check::Bool = true)
+    ∇ = similar(x)
+    s = similar(x)
+    y = similar(x)
+    d = similar(x)
+    Hy = d # we can alias memory here
+    BFGS(dir, H⁻¹, copy(x), ∇, d, s, y, Hy, check)
+end
+
+function BFGS(f::Function, x, H⁻¹::AbstractMatrix = identity(x); check = true)
+    BFGS(Gradient(f, x), x, H⁻¹, check = check)
+end
+function BFGS(f::Function, ∇::Function, x, H⁻¹::AbstractMatrix = identity(x), check = true)
+    BFGS(CustomDirection(f, x->(f(x), -∇(x)), x), x, H⁻¹, check = check)
+end
 objective(L::BFGS) = objective(L.direction)
 
 function valdir(N::BFGS, x::AbstractVector)
@@ -154,13 +155,14 @@ end
 # could also use recursive algorithm here to reduce memory footprint (see below)
 function bfgs_update!(H⁻¹::AbstractMatrix, s::AbstractVector, y::AbstractVector,
                     Hy::AbstractVector = similar(y), check::Bool = true)
-    ρ = 1/(s'y)
-    if ρ > 0 # function strongly convex -> update inverse Hessian
+    τ = s'y
+    if τ > 0 # function strongly convex -> update inverse Hessian
         mul!(Hy, H⁻¹, y)
+        ρ = 1/τ
         d = (ρ * dot(y, Hy) + 1) # rank 1
         @. H⁻¹ += ρ*(d*s*s' - s*Hy' - Hy*s')
-    elseif check
-        println("Warning: Skipping BFGS update because function is not strongly convex.")
+    elseif check && τ ≠ 0 # second condition happens in first iteration or at stationary point
+        println("WARNING: Skipping BFGS update because function is not strongly convex.")
     end
     return H⁻¹
 end
@@ -172,9 +174,10 @@ end
 # BFGS update corresponds to updating the Hessian as: (use for woodbury)
 # Hs = N.H*s
 # N.H .= N.H + y*y'*ρ - Hs*Hs' / dot(s, N.H, s)
+
 ################################################################################
 # limited memory Broyden-Fletcher-Goldfarb-Shanno algorithm
-struct LBFGS{T, D, X, V, A} <: Direction{T}
+struct LBFGS{T, D, X<:AbstractVector{T}, V, A, S} <: Direction{T}
     direction::D
     x::X # old x
     ∇::X # old gradient
@@ -182,30 +185,32 @@ struct LBFGS{T, D, X, V, A} <: Direction{T}
     s::V # previous m descent increments (including step size)
     y::V # previous m gradient differences
     m::Int # maximum recursion depth
-    α::A
+    α::A # temporary for α parameter in lbfgs_recursion
+    scaling!::S # scales direction in place with scaling!(N.d, s, y)
     check::Bool
-    function LBFGS(dir::D, x::X, m::Int; check::Bool = true) where {T,
-                                            D<:Direction, X<:AbstractVector{T}}
-        m ≥ 1 || error("recursion depth m cannot be smaller than 1")
-        n = length(x)
-        s = CircularBuffer{X}(m) # TODO: elements could be static arrays
-        y = CircularBuffer{X}(m)
-        V = typeof(s)
-        for i in 1:m
-            s.buffer[i] = zeros(n)
-            y.buffer[i] = zeros(n)
-        end
-        xold = copy(x)
-        ∇ = -dir(x)
-        d = -1e-6*∇
-        x .+= d # TODO: initial stepsize selection?
-        α = zeros(eltype(x), m)
-        new{T, D, X, V, typeof(α)}(dir, xold, ∇, d, s, y, m, α, check)
-    end
 end
-LBFGS(f::Function, x, m::Int) = LBFGS(Gradient(f, x), x, m)
-function LBFGS(f::Function, ∇::Function, x, m::Int)
-    LBFGS(CustomDirection(f, x->(f(x), -∇(x)), x), x, m)
+
+function LBFGS(dir::D, x::X, m::Int, scaling! = lbfgs_scaling!;
+                check::Bool = true) where {T, D<:Direction, X<:AbstractVector{T}}
+    m ≥ 1 || error("recursion depth m cannot be smaller than 1")
+    s = CircularBuffer{X}(m) # TODO: elements could be static arrays
+    y = CircularBuffer{X}(m)
+    V = typeof(s)
+    for i in 1:m
+        s.buffer[i] = similar(x)
+        y.buffer[i] = similar(x)
+    end
+    ∇ = similar(x)
+    d = similar(x)
+    α = zeros(eltype(x), m)
+    LBFGS(dir, copy(x), ∇, d, s, y, m, α, scaling!, check)
+end
+
+function LBFGS(f::Function, x, m::Int, scaling! = lbfgs_scaling!; check = true)
+    LBFGS(Gradient(f, x), x, m, scaling!, check = check)
+end
+function LBFGS(f::Function, ∇::Function, x, m::Int, scaling! = lbfgs_scaling!; check = true)
+    LBFGS(CustomDirection(f, x->(f(x), -∇(x)), x), x, m, scaling!, check = check)
 end
 objective(L::LBFGS) = objective(L.direction)
 
@@ -213,30 +218,39 @@ function valdir(N::LBFGS, x::AbstractVector)
     value, ∇ = valdir(N.direction, x)
     copy!(N.d, ∇)
     ∇ .*= -1 # since we get the direction, (negative gradient)
-    s = difference(x, N.x) # difference to avoid temporary
+    s = difference(x, N.x) # LazyDifference to avoid temporary
     y = difference(∇, N.∇)
-    ρ = 1/(s'y)
-    if ρ > 0 # only update inverse Hessian approximation if ρ > 0, like in BFGS!
-        copyfirst!(N.s, s); copy!(N.x, x) # lbfgs_update
-        copyfirst!(N.y, y); copy!(N.∇, ∇)
-    elseif N.check
-        println("Warning: Skipping LBFGS update because function is not strongly convex.")
+    τ = s'y
+    if τ > 0 # only update inverse Hessian approximation if ρ > 0, like in BFGS!
+        copyfirst!(N.s, s)
+        copyfirst!(N.y, y)
+    elseif N.check && τ ≠ 0
+        println("WARNING: Skipping L-BFGS update because function is not strongly convex.")
     end
+    copy!(N.x, x)
+    copy!(N.∇, ∇)
     t = length(N.s)
     α = t < N.m ? view(N.α, 1:t) : N.α # limit recursion if we haven't stepped enough
-    lbfgs_recursion!(N.d, N.s, N.y, α)
+    lbfgs_recursion!(N.d, N.s, N.y, α, N.scaling!)
     return value, N.d
 end
 
-# recursive algorithm to compute gradient hessian product
+# commonly used scaling of L-BFGS direction
+function lbfgs_scaling!(d::AbstractVector, s::CircularBuffer, y::CircularBuffer)
+    if length(s) ≥ 1
+        d .*= dot(s[1], y[1]) / sum(abs2, y[1])
+    end
+end
+
+# recursive algorithm to compute gradient-Hessian-product
 # WARNING: d has to be initialized with the negative gradient
-function lbfgs_recursion!(d::AbstractVector, s, y, α)
+function lbfgs_recursion!(d::AbstractVector, s, y, α, scaling! = lbfgs_scaling!)
     m = length(α)
     for i in 1:m
         α[i] = dot(s[i], d) / dot(s[i], y[i])
         d .-= α[i] * y[i]
     end
-    d .*= dot(s[1], y[1]) / sum(abs2, y[1]) # apply scaling
+    scaling!(d, s, y)
     for i in reverse(1:m)
         β_i = dot(y[i], d) / dot(y[i], s[i])
         d .+= (α[i] - β_i) * s[i]
