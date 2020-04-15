@@ -40,9 +40,9 @@ version = "1.1.0"
 
 [[DataStructures]]
 deps = ["InteractiveUtils", "OrderedCollections"]
-git-tree-sha1 = "73eb18320fe3ba58790c8b8f6f89420f0a622773"
+git-tree-sha1 = "4dead20a1606a60292529023d6eac18a1ef6432e"
 uuid = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
-version = "0.17.11"
+version = "0.17.12"
 
 [[Dates]]
 deps = ["Printf"]
@@ -65,9 +65,9 @@ deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
 [[ExprTools]]
-git-tree-sha1 = "08c1f74d9ad03acf0ee84c12c9e665ab1a9a6e33"
+git-tree-sha1 = "6f0517056812fd6aa3af23d4b70d5325a2ae4e95"
 uuid = "e2ba6199-217a-4e67-a87a-7c52f15ade04"
-version = "0.1.0"
+version = "0.1.1"
 
 [[EzXML]]
 deps = ["Printf", "XML2_jll"]
@@ -128,9 +128,9 @@ version = "1.3.0"
 
 [[LazyArrays]]
 deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra", "MacroTools", "StaticArrays"]
-git-tree-sha1 = "6b0bb634d4bfe394392f1784eb36d3e1c2ba9e88"
+git-tree-sha1 = "b3a6ed4a3511f1fb945bf7b7f04bc5e9a019303f"
 uuid = "5078a376-72f3-5289-bfd5-ec5146d43c02"
-version = "0.16.3"
+version = "0.16.4"
 
 [[LazyInverse]]
 deps = ["LinearAlgebra", "Test"]
@@ -159,7 +159,7 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[LinearAlgebraExtensions]]
 deps = ["FFTW", "InfiniteArrays", "LazyArrays", "LazyInverse", "LinearAlgebra", "StatsBase", "Test"]
-git-tree-sha1 = "43f3be26b1555b04d862d4fd199c7f937c1a82a8"
+git-tree-sha1 = "079ea88c2e730b7eac73b2916d8018b17e768553"
 repo-rev = "master"
 repo-url = "https://github.com/SebastianAment/LinearAlgebraExtensions.jl.git"
 uuid = "cb114d4a-f1bd-499c-ad9e-7f2ed74575b9"
@@ -186,7 +186,7 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[Metrics]]
 deps = ["ForwardDiff", "LazyInverse", "LinearAlgebra", "LinearAlgebraExtensions", "Test"]
-git-tree-sha1 = "18f988f3d8ba7e869adeaad96fecd7b3c09de1bc"
+git-tree-sha1 = "6269890ff788c8ecc0c97409b2361bfcf73bc8c2"
 repo-rev = "master"
 repo-url = "https://github.com/SebastianAment/Metrics.jl.git"
 uuid = "c142dcad-aa7a-4cb0-9847-771ddcebca7d"
@@ -314,9 +314,9 @@ uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 
 [[XML2_jll]]
 deps = ["Libdl", "Libiconv_jll", "Pkg", "Zlib_jll"]
-git-tree-sha1 = "39a309feb51413d39bdf544cf2fd09357bae37d2"
+git-tree-sha1 = "987c02a43fa10a491a5f0f7c46a6d3559ed6a8e2"
 uuid = "02c8fc9c-b97f-50b9-bbe4-9be30ff0a78a"
-version = "2.9.9+2"
+version = "2.9.9+4"
 
 [[Zlib_jll]]
 deps = ["Libdl", "Pkg"]

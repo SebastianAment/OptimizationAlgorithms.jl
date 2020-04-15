@@ -95,9 +95,9 @@ direction(D::Direction, x) = valdir(D, x)[2]
 # direction(D::Direction, x, t::Int) = valdir(D, x)[2]
 
 # calculates direction and value at the same time
-# valuedirection(D::Direction, x, t::Int) = valdir(D::Direction, x)
-valuedirection(D::Direction) = x -> valdir(D, x)
-const valdir = valuedirection
+# value_direction(D::Direction, x, t::Int) = valdir(D::Direction, x)
+value_direction(D::Direction) = x -> valdir(D, x)
+const valdir = value_direction
 
 ################################################################################
 include("util.jl")
