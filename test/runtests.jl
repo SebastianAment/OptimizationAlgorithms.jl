@@ -1,7 +1,3 @@
-include("util.jl")
-include("descentdirections.jl")
-include("descentupdates.jl")
-include("compressedsensing.jl")
-include("linearsolvers.jl")
-include("stepsize.jl")
-include("submodular.jl")
+for file in readlines(joinpath(@__DIR__, "testgroups"))
+    include(file * ".jl")
+end

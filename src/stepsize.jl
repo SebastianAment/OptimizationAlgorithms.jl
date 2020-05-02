@@ -1,5 +1,6 @@
 # TODO: quasi-exact line search via interpolation, GPs
 # TODO: g .*= -g'g / (g'A*g) # optimal stepsize for quadratic problems
+
 ################################################################################
 # inputs: searchcondition function, i.e. Armijo, Wolfe
 # stepupdate is step size updating policy
@@ -23,31 +24,47 @@ struct DecreasingStep{T, D, A, S} <: Update{T}
     decrease::S # μείωση factor
     # increase::S # αύξηση factor
     maxbacktrack::Int
-    function DecreasingStep(dir::D, x::T, α::S = 1., c = 1., decrease = 3.,
+    function DecreasingStep(dir::D, x::T, α::S = 1., c = 1., decrease = 3., # increase = 2
                             maxbacktrack::Int = 16) where {T, D<:Direction, S}
         # makes sure that we use a copy of x
         new{T, D, S, S}(dir, copy(x), α, S(c), S(decrease), maxbacktrack)
     end
 end
-# function DecreasingStep(obj::Function, valdir::Function, x,
-#             α::S = 1., c = 0., decrease = 3.,
-#             increase = 2., maxbacktrack::Int = 16) where {S<:Real}
-#     x = fill(zero(eltype(x)), size(x))
-#     D = CustomDirection(obj, valdir, x)
-#     DecreasingStep(D, copy(x), α, S(c), S(decrease), S(increase), maxbacktrack)
-# end
 
 objective(D::DecreasingStep) = objective(D.direction)
 function update!(D::DecreasingStep, x)
     val, dir = valdir(D.direction, x)
-    descent = descent_condition(objective(D), val, dir, D.c)
+    descent = DescentCondition(objective(D), val, x, D.c)
     success = linesearch!(D.x, x, D.α, dir, descent, D.maxbacktrack, D.decrease)
     return success ? copy!(x, D.x) : x
 end
 
+# combines descent condition and local minimum w.r.t. step size α condition
+mutable struct DescentCondition{T, F, X}
+    f::F # objective function
+    value::T # value f(x)
+    new_value::T # value at most recently proposed point f(xn)
+    xn::X
+    c::T # descent factor
+end
+function DescentCondition(objective::Function, value, x, c::Real = 1.)
+    DescentCondition(objective, value, typeof(value)(Inf), similar(x), c)
+end
+function (D::DescentCondition)(α, xn)
+    decreasing = D.new_value ≤ D.c * D.value # was the last proposal decreasing
+    new_value = D.f(xn)
+    alpha_minimum = D.new_value ≤ new_value # was the last proposal a stationary point w.r.t. α?
+    if decreasing && alpha_minimum
+        xn .= D.xn # assign last proposal to current one
+        true
+    else
+        D.xn .= xn
+        D.new_value = new_value
+        false
+    end
+end
 # weakest rule, no good theoretical guarantees, but works in practice and is fast
-function descent_condition(objective::Function, value, direction::T,
-                                                        c::Real = 1.) where {T}
+function descent_condition(objective::Function, value, c::Real = 1.)
     return descent(α, xn) = (objective(xn) ≤ c * value)
 end
 
@@ -205,19 +222,29 @@ end
 #     abs(d'gradient(f, xn)) ≤ abs(c*dg) # weak rule: -d'∇(x + α*d) ≤ -c*d'∇(x)
 # end
 
-# ε is smallest allowable step size
-# function update!(A::ArmijoStep, x, t::Int...)
-#     f = A.val
-#     y, d = A.valdir(x, t...) # only t dependence
-#     dg = typeof(A.d) <: Gradient ? d'd : d'gradient(f, x) # TODO: generalize FD gradient?
-#     for i in 1:A.maxbacktrack
-#         @. A.x = x + A.α * d
-#         if (f(A.x) ≤ y + A.α * A.c * dg) #|| α < ε # rule for minimization
-#             copy!(x, A.x)  # only if we jump out with a good step size, reassign A.x to x
-#             break
-#         end
-#         A.α ./= A.decrease
+################################## WIP #########################################
+# the minimization is expensive as we have to reevaluate the gradient of the objective
+# better with interpolation?
+# step size calculated with approximate minimization via secant method
+# struct SecantStep{T, D<:Direction{T}} <: Update{T}
+#     direction::D
+# end
+#
+# objective(D::SecantStep) = objective(D.direction)
+# function update!(D::SecantStep, x)
+#     val, dir = valdir(D.direction, x)
+#     descent = descent_condition(objective(D), val, dir, D.c)
+#     success = linesearch!(D.x, x, D.α, dir, descent, D.maxbacktrack, D.decrease)
+#     # α, success = linesearch!(D.x, x, D.α, dir, descent, D.maxbacktrack, D.decrease)
+#     # D.α = α * D.increase
+#     function value(α)
+#         @. xn = x + α * direction # update
+#         value(D, xn)
 #     end
-#     # A.α = α * A.increase
-#     return x
+#     function value_direction(α)
+#         @. xn = x + α * direction # update
+#         val, dir = value_direction(D, xn)
+#         val, dot(dir, direction)
+#     end
+#     return success ? copy!(x, D.x) : x
 # end

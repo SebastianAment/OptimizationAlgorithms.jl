@@ -167,8 +167,8 @@ function bfgs_update!(H⁻¹::AbstractMatrix, s::AbstractVector, y::AbstractVect
     return H⁻¹
 end
 # old update (allocating)
-# A = (I - ρ*s*y') # TODO: pre-allocate?
-# H⁻¹ .= A * H⁻¹ * A' .+ ρ*s*s' # TODO: woodbury?
+# A = (I - ρ*s*y') # pre-allocate?
+# H⁻¹ .= A * H⁻¹ * A' .+ ρ*s*s' # woodbury?
 # else # re-initialize inverse hessian to diagonal, if not strongly convex
 #     N.H⁻¹ .= I(length(x))
 # BFGS update corresponds to updating the Hessian as: (use for woodbury)

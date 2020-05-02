@@ -7,6 +7,7 @@ using LinearAlgebraExtensions: difference, LazyDifference
 # define euclidean metric
 const euclidean = Metrics.EuclideanMetric()
 
+# TODO: fix NaN behavior in LBFGS/ DecreasingStep
 # TODO: pretty-print of statistics of optimization run (number of steps, objective function history, etc.)
 # TODO: all directions are time-indpendent, except ADAM if interpreted as direction
 # could be remedied, if we add an ADAM stepsize, which is time-dependent
@@ -29,6 +30,7 @@ const euclidean = Metrics.EuclideanMetric()
 # attempts to find a fixed point of f! by iterating f! on x
 # in light of ode's, this could be a gradient flow
 # general enough: iterate! - ?
+# f! should be a fixed point operator, so ∃x s.t. x = f!(x)
 function fixedpoint!(f!, x, isfixed)
     t = 1
     while !isfixed(x, t)
@@ -41,26 +43,59 @@ end
 # using default stopping criterion
 fixedpoint!(f!, x) = fixedpoint!(f!, x, StoppingCriterion(x))
 
+# TODO:
+# f!(x, t) should update x and return the value y
+function optimize!(f!, x, isfixed)
+    y = f!(x, t)
+    t = 1
+    while !isfixed(x, y, t)
+        y = f!(x, t)
+        t += 1
+    end
+    x, y, t
+end
+optimize!(f!, x) = optimize!(f!, x, StoppingCriterion(x))
+
 ########################### Stopping Criterion ##################################
 # abstract type StoppingCriterion{T} end
-# TODO: add minimum relative change
-struct StoppingCriterion{T, S}
+mutable struct StoppingCriterion{T, S}
     x::T # holds last value of parameters
-    δ::S # minimum absolute change in parameters x for termination
-    # δᵣ::S # minimum relative change in function value
+    dx::S # minimum absolute change in parameters x for termination
+    rx::S # minimum relative change in parameters x for termination
+
+    y::S # holds last function value
+    dy::S
+    ry::S
+
     maxiter::Int # maximum iterations
-    # ε::T # minimum absolute change in function f for termination
-    # y::T # holds last function value
-    function StoppingCriterion(x, δ::Real = 1e-6, maxiter::Int = 128)
-        new{typeof(x), typeof(δ)}(fill(Inf, size(x)), δ, maxiter) #  δᵣ = δₐ,
+    function StoppingCriterion(x::AbstractVector, y::Real = Inf;
+                dx = 1e-6, rx = 0., dy = 1e-6, ry = 0., maxiter::Int = 128)
+        new{typeof(x), typeof(y)}(fill(Inf, size(x)), dx, rx, y, dy, ry, maxiter)
     end
 end
-function (T::StoppingCriterion)(x, t)
-    # δᵣ = (y - T.y) / y # relative change in function value
-    val = euclidean(x, T.x) < T.δ || t > T.maxiter #|| δᵣ < T.δᵣ
+
+(T::StoppingCriterion)(x::AbstractVector, t::Integer) = T(x) || T(t)
+(T::StoppingCriterion)(y::Real, t::Integer) = T(y) || T(t)
+function (T::StoppingCriterion)(x::AbstractVector)
+    any(isnan, x) && error("x contains NaN: x = $x")
+    dx = euclidean(x, T.x)
+    rx = dx / norm(x)
+    isfixed = dx < T.dx
+    isfixed |= rx < T.rx
     T.x .= x
-    return val
+    return isfixed
 end
+function (T::StoppingCriterion)(y::Real)
+    isnan(y) && error("y = NaN")
+    dy = abs(y - T.y)
+    ry = dy / abs(y)
+    isfixed = dy < T.dy
+    isfixed |= ry < T.ry
+    isfixed |= T.maxiter < t
+    T.y = y
+    return isfixed
+end
+(T::StoppingCriterion)(t::Integer) = T.maxiter < t
 
 ######################## Canonical Descent Directions ##########################
 # abstract type FixedPointIterator{T} end # makes sense as long as we stick to optimization

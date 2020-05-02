@@ -16,7 +16,7 @@ using ForwardDiff: gradient
     G = ScaledGradient(f, x)
     G = PolyakMomentum(G, copy(x), .5)
     ε = 1e-6
-    fixedpoint!(G, x, StoppingCriterion(x, 1e-2ε))
+    fixedpoint!(G, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
 end
 
@@ -31,7 +31,7 @@ end
     G = ScaledGradient(f, x)
     G = Nesterov(G, copy(x), 1., .01)
     ε = 1e-6
-    fixedpoint!(G, x, StoppingCriterion(x, 1e-2ε))
+    fixedpoint!(G, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
 end
 
