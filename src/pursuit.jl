@@ -1,27 +1,47 @@
 abstract type AbstractPursuit{T} <: Update{T} end
-# AbstractPursuit
-@inline function _residual!(P, x::AbstractVector) # 0 alloc
-    copyto!(P.r, P.b)
-    mul!(P.r, P.A, x, -1, 1)
+
+############################# Matching Pursuit #################################
+# should MP, OMP, have a k parameter?
+# SSP needs one, but for MP could be handled in outer loop
+# WARNING: requires A to have unit norm columns
+struct MatchingPursuit{T, AT<:AbstractMatrix{T}, B<:AbstractVector{T}} <: AbstractPursuit{T}
+    A::AT
+    b::B
+    k::Int # maximum number of non-zeros
+
+    # temporary storage
+    r::B # residual
+    Ar::B # inner products between measurement matrix and residual
+    # a approximation
 end
-@inline function _factorize!(P, x::AbstractVector)
-    n = size(P.A, 1)
-    k = nnz(x)
-    Ai = reshape(@view(P.Ai[1:n*k]), n, k)
-    @. Ai = @view(P.A[:, x.nzind])
-    return qr!(Ai) # this still allocates a little memory
+const MP = MatchingPursuit
+function MP(A::AbstractMatrix, b::AbstractVector, k::Integer)
+    n, m = size(A)
+    T = eltype(A)
+    r, Ar = zeros(T, n), zeros(T, m)
+    MP(A, b, k, r, Ar)
 end
-@inline function _solve!(P, x::AbstractVector)
-    F = _factorize!(P, x)
-    ldiv!(x.nzval, F, P.b)     # optimize all active atoms
-    dropzeros!(x)
+
+function update!(P::MP, x::AbstractVector = spzeros(size(P.A, 2)))
+    nnz(x) ≥ P.k && return x # return if the maximum number of non-zeros was reached
+    residual!(P, x) # TODO: could avoid calculating residual and just update it and approximation
+    i = maxabsdot!(P)
+    x[i] += dot(@view(P.A[:,i]), P.r) # add non-zero index to x
+    return x
+end
+
+# calculates k-sparse approximation to Ax = b via matching pursuit
+function mp(A::AbstractMatrix, b::AbstractVector, k::Int, x = spzeros(size(A, 2)))
+    P! = MP(A, b, k)
+    fixedpoint!(P!, x, StoppingCriterion(x, maxiter = k, dx = eps(eltype(A))))
+    x
 end
 
 ###################### Orthogonal Matching Pursuit #############################
 # TODO: preconditioning, non-negativity constraint -> NNLS.jl
 using SparseArrays
 struct OrthogonalMatchingPursuit{T, AT<:AbstractMatrix{T},
-                                    B<:AbstractVector{T}} <: Update{T}
+                                    B<:AbstractVector{T}} <: AbstractPursuit{T}
     A::AT
     b::B
     k::Int # maximum number of non-zeros
@@ -42,17 +62,11 @@ end
 
 function update!(P::OMP, x::AbstractVector = spzeros(size(P.A, 2)))
     nnz(x) ≥ P.k && return x # return if the maximum number of non-zeros was reached
-    _residual!(P, x)
-    i = _ompindex!(P)
+    residual!(P, x)
+    i = maxabsdot!(P)
     x[i] = NaN # add non-zero index to x
-    _solve!(P, x) # optimize all active atoms
+    solve!(P, x) # optimize all active atoms
     return x
-end
-
-@inline function _ompindex!(P::OMP) # 0 alloc
-    mul!(P.Ar, P.A', P.r)
-    @. P.Ar = abs(P.Ar)
-    argmax(P.Ar)
 end
 
 # calculates k-sparse approximation to Ax = b via orthogonal matching pursuit
@@ -66,7 +80,7 @@ function omp(A::AbstractMatrix, b::AbstractVector, k::Int)
 end
 
 ################################## Subspace Pursuit ############################
-struct SubspacePursuit{T, AT<:AbstractMatrix{T}, B<:AbstractVector{T}} <: Update{T}
+struct SubspacePursuit{T, AT<:AbstractMatrix{T}, B<:AbstractVector{T}} <: AbstractPursuit{T}
     A::AT
     b::B
     k::Int # maximum number of non-zeros
@@ -100,22 +114,18 @@ function update!(P::SSP, x::AbstractVector = spzeros(size(P.A, 2)))
         return x .= omp(P.A, P.b, P.k) # first iteration is via omp
     end
     nnz(x) == P.k || throw("nnz(x) = $(nnz(x)) ≠ $(P.k) = k")
-
-    _residual!(P, x)
+    residual!(P, x)
     i = _sspindex!(P)
     @. x[i] = NaN # add non-zero index to x
-
-    _solve!(P, x) # optimize all active atoms
-
+    solve!(P, x) # optimize all active atoms
     i = partialsortperm(abs.(x.nzval), 1:P.k) # find k smallest atoms
     @. x.nzval[i] = 0
     dropzeros!(x)
-
-    _solve!(P, x) # optimize all active atoms
+    solve!(P, x) # optimize all active atoms
     return x
 end
 
-# calculates k-sparse approximation to Ax = b via orthogonal matching pursuit
+# calculates k-sparse approximation to Ax = b via subspace pursuit
 function ssp(A::AbstractMatrix, b::AbstractVector, k::Int; iter = 6)
     P! = SSP(A, b, k)
     x = spzeros(size(A, 2))
@@ -125,6 +135,30 @@ function ssp(A::AbstractMatrix, b::AbstractVector, k::Int; iter = 6)
     return x
 end
 
+####################### Pursuit Helpers ########################################
+# calculates residual of
+@inline function residual!(P::AbstractPursuit, x::AbstractVector)
+    copyto!(P.r, P.b)
+    mul!(P.r, P.A, x, -1, 1)
+end
+# returns index of atom with largest dot product with residual
+@inline function maxabsdot!(P::AbstractPursuit) # 0 alloc
+    mul!(P.Ar, P.A', P.r)
+    @. P.Ar = abs(P.Ar)
+    argmax(P.Ar)
+end
+@inline function _factorize!(P::AbstractPursuit, x::AbstractVector)
+    n = size(P.A, 1)
+    k = nnz(x)
+    Ai = reshape(@view(P.Ai[1:n*k]), n, k)
+    @. Ai = @view(P.A[:, x.nzind])
+    return qr!(Ai) # this still allocates a little memory
+end
+@inline function solve!(P::AbstractPursuit, x::AbstractVector)
+    F = _factorize!(P, x)
+    ldiv!(x.nzval, F, P.b)     # optimize all active atoms
+    dropzeros!(x)
+end
 
 # function precondition_omp()
 #     A, μ, σ = center!(A)
