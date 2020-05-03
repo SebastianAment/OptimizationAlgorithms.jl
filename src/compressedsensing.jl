@@ -1,5 +1,6 @@
 # Compressed Sensing algorithms
-# TODO: move over OMP, etc.
+
+include("pursuit.jl")
 
 ########################## Sparse Bayesian Learning ############################
 # sparse bayesian learning for regression

@@ -52,7 +52,6 @@ struct Adam{T, F, V} <: Update{T} # think of it as direction
     m::V # first moment estimate
     v::V # second moment estimate
     ε::T
-    # r::R # DiffResults
 end
 function Adam(f, α::Real, β₁::Real, β₂::Real, x::AbstractVector, ε::Real = 1e-8)
     m, v = one(x), one(x)
