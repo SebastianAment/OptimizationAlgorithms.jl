@@ -33,6 +33,7 @@ end
 
     # greedy sparse bayesian learning
     using Optimization: greedy_sbl
+    println("starting greedy")
     xgsbl = greedy_sbl(A, b, σ)
 
     @test findall(abs.(xgsbl) .> 1e-3) == x.nzind

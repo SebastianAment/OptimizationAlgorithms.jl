@@ -1,6 +1,7 @@
 ########################## Sparse Bayesian Learning ############################
 # sparse bayesian learning for linear regression
 # TODO: investigate direct optimization of nlml, not via em
+# ... and unification of all sbl algorithms via functional α_update
 using LinearAlgebraExtensions: AbstractMatOrUni, AbstractMatOrFac
 using LazyInverse: inverse
 using WoodburyIdentity
@@ -66,6 +67,22 @@ function GSBL(A::AbstractMatrix, b::AbstractVector, σ²::Real)
     GSBL(A, b, σ²*I(length(b)))
 end
 
+function optimize!(sbl::GSBL; maxiter = 128, dx = 1e-2)
+    for i in 1:maxiter
+        sbl(sbl.α)
+        if maximum(sbl.δ) < dx
+            break
+        end
+    end
+    sbl
+end
+
+function greedy_sbl(A, b, σ; maxiter = 128, dx = 1e-2)
+    sbl = GSBL(A, b, σ)
+    optimize!(sbl)
+    sbl.x
+end
+
 function Base.getproperty(S::GSBL, s::Symbol)
     if s == :x
         isactive = @. !isinf(S.α) # active basis patterns
@@ -116,6 +133,7 @@ end
 function update_α!(α, δ, S, Q)
     k = argmax(δ)
     sk, qk = sq(S[k], Q[k], α[k])
+    an = optimal_α(sk, qk)
     α[k] = optimal_α(sk, qk)
     return α
 end
@@ -162,11 +180,4 @@ end
 
 function optimal_α(s::Real, q::Real)
     s < q^2 ? s^2 / (q^2 - s) : Inf
-end
-
-function greedy_sbl(A, b, σ; maxiter = 128, dx = 1e-6)
-    S! = GSBL(A, b, σ)
-    α = S!.α
-    α, t = fixedpoint!(S!, α, StoppingCriterion(α, maxiter = maxiter, dx = dx))
-    S!.x
 end
