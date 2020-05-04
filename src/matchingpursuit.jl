@@ -2,7 +2,7 @@ abstract type AbstractPursuit{T} <: Update{T} end
 
 ############################# Matching Pursuit #################################
 # should MP, OMP, have a k parameter?
-# SSP needs one, but for MP could be handled in outer loop
+# SP needs one, but for MP could be handled in outer loop
 # WARNING: requires A to have unit norm columns
 struct MatchingPursuit{T, AT<:AbstractMatrix{T}, B<:AbstractVector{T}} <: AbstractPursuit{T}
     A::AT
@@ -90,28 +90,29 @@ struct SubspacePursuit{T, AT<:AbstractMatrix{T}, B<:AbstractVector{T}} <: Abstra
     Ar::B # inner products between measurement matrix and residual
     Ai::AT # space for A[:, x.nzind] and its qr factorization
 end
-const SSP = SubspacePursuit
+const SP = SubspacePursuit
 
-function SSP(A::AbstractMatrix, b::AbstractVector, k::Integer)
+function SP(A::AbstractMatrix, b::AbstractVector, k::Integer)
+    2k > length(b) && error("2k = $(2k) > $(length(b)) = length(b) is invalid for Subspace Pursuit")
     n, m = size(A)
     T = eltype(A)
     r, Ar = zeros(T, n), zeros(T, m)
     Ai = zeros(T, (n, 2k))
-    SSP(A, b, k, r, Ar, Ai)
+    SP(A, b, k, r, Ar, Ai)
 end
 
 # returns indices of k atoms with largest inner products with residual
 # TODO: need threshold for P.Ar
-@inline function _sspindex!(P::SSP)
+@inline function _sspindex!(P::SP)
     mul!(P.Ar, P.A', P.r)
     @. P.Ar = abs(P.Ar)
     partialsortperm(P.Ar, 1:P.k, rev = true)
 end
 
 # TODO: could pre-allocate nz arrays to be of length 2K
-function update!(P::SSP, x::AbstractVector = spzeros(size(P.A, 2)))
+function update!(P::SP, x::AbstractVector = spzeros(size(P.A, 2)))
     if nnz(x) == 0
-        return x .= omp(P.A, P.b, P.k) # first iteration is via omp
+        return x .= omp(P.A, P.b, P.k) # first iteration via omp
     end
     nnz(x) == P.k || throw("nnz(x) = $(nnz(x)) ≠ $(P.k) = k")
     residual!(P, x)
@@ -126,8 +127,8 @@ function update!(P::SSP, x::AbstractVector = spzeros(size(P.A, 2)))
 end
 
 # calculates k-sparse approximation to Ax = b via subspace pursuit
-function ssp(A::AbstractMatrix, b::AbstractVector, k::Int; iter = 6)
-    P! = SSP(A, b, k)
+function sp(A::AbstractMatrix, b::AbstractVector, k::Int; iter = 8)
+    P! = SP(A, b, k)
     x = spzeros(size(A, 2))
     for i in 1:iter
         P!(x)

@@ -63,8 +63,8 @@ function GSBL(A::AbstractMatrix, b::AbstractVector, Σ)
     GSBL(A, b, Σ, α, S, Q, δ)
 end
 
-function GSBL(A::AbstractMatrix, b::AbstractVector, σ²::Real)
-    GSBL(A, b, σ²*I(length(b)))
+function GSBL(A::AbstractMatrix, b::AbstractVector, σ::Real)
+    GSBL(A, b, σ^2*I(length(b)))
 end
 
 function optimize!(sbl::GSBL; maxiter = 128, dx = 1e-2)
@@ -164,7 +164,7 @@ function δ_delete(S, Q, α)
 end
 function δ_update(S, Q, α, αn)
     d = 1/αn - 1/α
-    Q^2 / (S + 1/d) - log(1 + S*d)
+    Q^2 / (S + 1/d) - log(max(1 + S*d, 0))
 end
 
 # calculate small s, q from S, Q (see Tipping 2003)
