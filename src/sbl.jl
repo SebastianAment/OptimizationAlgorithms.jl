@@ -81,28 +81,18 @@ function Base.getproperty(S::GSBL, s::Symbol)
     end
 end
 
-
-function initialize!(sbl::GSBL, α::AbstractVector)
-    # nA = sum(abs2, A, dims = 1)[:]
-    inner = sbl.A'sbl.b
-    k = argmax(abs.(inner))# ./ nA)
-    α[k] = inner[k] #nA[k] / (inner[k])
-    α
-end
-
-# should the input be α?
 function update!(sbl::GSBL, α::AbstractVector)
     isactive = @. !isinf(α) # active basis patterns
     A, b, Σ, S, Q = sbl.A, sbl.b, sbl.Σ, sbl.S, sbl.Q
-    if !any(isactive)
-        return initialize!(sbl, α)
-    end
     # get kernel matrix C
-    Ai = @view A[:, isactive]
-    Γ = Diagonal(inv.(α[isactive]))
-    C = Woodbury(Σ, Ai, Γ, Ai')
-    C = factorize(C)
-    C⁻¹ = inverse(C)
+    if any(isactive)
+        Ai = @view A[:, isactive]
+        Γ = Diagonal(inv.(α[isactive]))
+        C = Woodbury(Σ, Ai, Γ, Ai')
+        C⁻¹ = inverse(factorize(C))
+    else
+        C⁻¹ = inverse(Σ)
+    end
     # update sparsity and quality factors
     @threads for k in 1:size(A, 2)
         Ak = @view A[:, k]
@@ -174,11 +164,9 @@ function optimal_α(s::Real, q::Real)
     s < q^2 ? s^2 / (q^2 - s) : Inf
 end
 
-function greedy_sbl(A, b, σ; maxiter = 128)
-    S = GSBL(A, b, σ)
-    α = S.α
-    for i in 1:maxiter
-        S(α)
-    end
-    S.x
+function greedy_sbl(A, b, σ; maxiter = 128, dx = 1e-6)
+    S! = GSBL(A, b, σ)
+    α = S!.α
+    α, t = fixedpoint!(S!, α, StoppingCriterion(α, maxiter = maxiter, dx = dx))
+    S!.x
 end
