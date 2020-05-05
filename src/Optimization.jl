@@ -7,6 +7,7 @@ using LinearAlgebraExtensions: difference, LazyDifference
 # define euclidean metric
 const euclidean = Metrics.EuclideanMetric()
 
+# TODO: update_value!: updates input and returns value of updated input
 # TODO: pretty-print of statistics of optimization run (number of steps, objective function history, etc.)
 # TODO: all directions are time-indpendent, except ADAM if interpreted as direction
 # could be remedied, if we add an ADAM stepsize, which is time-dependent

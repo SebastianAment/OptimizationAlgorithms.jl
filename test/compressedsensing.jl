@@ -84,4 +84,21 @@ end
     @test isapprox(A*xgsbl, b, atol = 5σ)
 end
 
+@testset "Basis Pursuit" begin
+    using Optimization: basispursuit, candes_reweighting, ard_reweighting
+    # equality constrained l1 minimization
+    n, m = 16, 64
+    k = 3
+    σ = 0.
+    A, x, b = sparse_data(n = n, m = m, k = k, σ = σ, normalized = true)
+    xl = basispursuit(A, b)
+    @test xl.nzind == x.nzind
+
+    xc = candes_reweighting(A, b)
+    @test xc.nzind == x.nzind
+
+    xard = ard_reweighting(A, b)
+    @test xard.nzind == x.nzind
+end
+
 end # TestCompressedSensing
