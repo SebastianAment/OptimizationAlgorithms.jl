@@ -77,16 +77,17 @@ end
 
     # BFGS with ill-conditioned problem
     x = randn(n)
-    α = [1e6, 1., 1e-6]
+    α = [1e3, 1., 1e-3]
     g(x) = f(α.*x)
     B = Optimization.BFGS(g, x)
-    x, t = fixedpoint!(B, x, StoppingCriterion(x, dx = 1e-3ε))
+    x, t = fixedpoint!(B, x, StoppingCriterion(x, dx = 1e-3ε, maxiter = 256))
     # test BFGS where inverse Hessian is initialized to Diagonal(1.0./α.^2)
     xs = randn(n)
     BS = Optimization.BFGS(g, xs, Matrix(Diagonal(1.0./α.^2)))
-    xs, ts = fixedpoint!(BS, xs, StoppingCriterion(x, dx = 1e-3ε))
+    xs, ts = fixedpoint!(BS, xs, StoppingCriterion(x, dx = 1e-3ε, maxiter = 256))
     @test norm(gradient(g, x)) < ε
     @test norm(gradient(g, xs)) < ε
+
     # @test ts < t # scaling outperforms non-scaling for ill-conditioned problem
     # # WARNING: This test could fail, but most times doesn't
 
@@ -124,12 +125,6 @@ end
     ε = 1e-6
     x, t = fixedpoint!(B, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
-
-    # ill-conditioned problem, wouldn't work without scaling function
-    scaling!(d, s, y) = (d .*= 1.0./α.^2)
-    B = Optimization.LBFGS(g, x, 3, scaling!, check = true)
-    x, t = fixedpoint!(B, x, StoppingCriterion(x, dx = 1e-2ε))
-    @test norm(gradient(g, x)) < ε
 end
 
 @testset "CustomDirection" begin
@@ -150,6 +145,15 @@ end
     ε = 1e-6
     fixedpoint!(B, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
+
+    U = Optimization.UnitDirection(B)
+    @test U(x) isa AbstractVector
+    @test norm(U(x)) ≈ 1
+    @test dot(U(x), B(x)) ≈ norm(B(x)) # co-linear with original direction
+
+    TD = Optimization.TrustedDirection(B)
+    @test TD(x) isa AbstractVector
+    @test norm(TD(x)) ≤ 1
 end
 
 end # TestDescentDirections

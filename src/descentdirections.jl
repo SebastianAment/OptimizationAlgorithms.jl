@@ -44,7 +44,7 @@ struct Newton{T, F, V, R} <: Direction{T}
 end
 # TODO: specialize factorization of hessian
 # cholesky only if problem is p.d. (constraint optimization with Lagrange multipliers isn't)
-function valdir(N::Newton, x)
+function valdir(N::Newton, x::AbstractVector)
     hessian!(N.r, N.f, x)
     ∇ = DiffResults.gradient(N.r)
     H = DiffResults.hessian(N.r)
@@ -256,6 +256,40 @@ function lbfgs_recursion!(d::AbstractVector, s, y, α, scaling! = lbfgs_scaling!
         d .+= (α[i] - β_i) * s[i]
     end
     return d
+end
+
+################################################################################
+# rescales direction to have unit norm
+struct UnitDirection{T, D<:Direction{T}} <: Direction{T}
+   direction::D
+end
+objective(D::UnitDirection) = objective(D.direction)
+value(D::UnitDirection, x::AbstractArray) = value(D.direction, x)
+function value_direction(D::UnitDirection, x::AbstractArray)
+   v, d = value_direction(D.direction, x)
+   n = norm(d)
+   if n > 0
+       d ./= n
+   end
+   v, d
+end
+
+# caps norm of direction, to maxdirnorm
+# can prevent optimization from shooting off
+struct TrustedDirection{T, D<:Direction{T}, S} <: Direction{T}
+   direction::D
+   maxdirnorm::S
+end
+TrustedDirection(d::Direction) = TrustedDirection(d, 1.)
+objective(D::TrustedDirection) = objective(D.direction)
+value(D::TrustedDirection, x::AbstractArray) = value(D.direction, x)
+function value_direction(D::TrustedDirection, x::AbstractArray)
+   v, d = value_direction(D.direction, x)
+   n = norm(d)
+   if n > D.maxdirnorm
+       d ./= n
+   end
+   v, d
 end
 
 ################################################################################
