@@ -36,7 +36,7 @@ function update!(D::DecreasingStep, x)
     val, dir = valdir(D.direction, x)
     descent = DescentCondition(objective(D), val, x, D.c)
     success = linesearch!(D.x, x, D.α, dir, descent, D.maxbacktrack, D.decrease)
-    return success ? copy!(x, D.x) : x
+    return success ? copyto!(x, D.x) : x
 end
 
 # combines descent condition and local minimum w.r.t. step size α condition
@@ -97,7 +97,7 @@ function update!(A::ArmijoStep, x)
     grad = A.gradient(x)
     armijo = armijo_condition(objective(A), val, dir, grad, A.c)
     success = linesearch!(A.x, x, A.α, dir, armijo, A.maxbacktrack, A.decrease)
-    return success ? copy!(x, A.x) : x
+    return success ? copyto!(x, A.x) : x
 end
 
 # returns a function which calculates the armijo condition
