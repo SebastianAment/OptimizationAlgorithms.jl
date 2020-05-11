@@ -102,6 +102,10 @@ version = "0.17.15"
 deps = ["Printf"]
 uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 
+[[DelimitedFiles]]
+deps = ["Mmap"]
+uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+
 [[DiffResults]]
 deps = ["StaticArrays"]
 git-tree-sha1 = "da24935df8e0c6cf28de340b958f6aac88eaa0cc"
@@ -152,6 +156,12 @@ deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "NaNMath", "Random",
 git-tree-sha1 = "869540e4367122fbffaace383a5bdc34d6e5e5ac"
 uuid = "f6369f11-7733-5829-9624-2563aa707210"
 version = "0.10.10"
+
+[[GR]]
+deps = ["Base64", "DelimitedFiles", "LinearAlgebra", "Printf", "Random", "Serialization", "Sockets", "Test", "UUIDs"]
+git-tree-sha1 = "1185d50c5c90ec7c0784af7f8d0d1a600750dc4d"
+uuid = "28b8d3ca-fb5f-59d9-8090-bfdbd6d07a71"
+version = "0.49.1"
 
 [[HTTP]]
 deps = ["Base64", "Dates", "IniFile", "MbedTLS", "Sockets"]
@@ -209,6 +219,14 @@ deps = ["Calculus", "DataStructures", "ForwardDiff", "LinearAlgebra", "MathOptIn
 git-tree-sha1 = "84c1cf8bec4729b8b2ef4dfc4e1db1b892ad0d30"
 uuid = "4076af6c-e467-56ae-b986-b466b2749572"
 version = "0.21.2"
+
+[[Kernel]]
+deps = ["ForwardDiff", "GR", "LazyInverse", "LinearAlgebra", "LinearAlgebraExtensions", "Metrics", "SpecialFunctions", "Statistics", "Test", "ToeplitzMatrices", "WoodburyIdentity"]
+git-tree-sha1 = "8b730cd7dec1c5d03632ac62f19cfeb7198f70a0"
+repo-rev = "master"
+repo-url = "git@github.com:SebastianAment/Kernel.jl.git"
+uuid = "b3329135-7958-41d4-bb02-e084c5a526bf"
+version = "0.1.0"
 
 [[LazyArrays]]
 deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra", "MacroTools", "MatrixFactorizations", "StaticArrays"]
@@ -444,6 +462,12 @@ deps = ["Dates", "EzXML", "Mocking", "Printf", "RecipesBase", "Serialization", "
 git-tree-sha1 = "07af1bd3226d644ca1a3235c93e7d0207ce4536a"
 uuid = "f269a46b-ccf7-5d73-abea-4c690281aa53"
 version = "1.1.1"
+
+[[ToeplitzMatrices]]
+deps = ["AbstractFFTs", "FFTW", "LinearAlgebra", "StatsBase"]
+git-tree-sha1 = "5351f20c159d02fa1372076d0731a38066efd137"
+uuid = "c751599d-da0a-543b-9d20-d0a503d91d24"
+version = "0.6.0"
 
 [[TranscodingStreams]]
 deps = ["Random", "Test"]

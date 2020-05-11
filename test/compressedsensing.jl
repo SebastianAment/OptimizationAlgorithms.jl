@@ -65,6 +65,24 @@ end
     @test isapprox(xomp.nzval, x.nzval, atol = 5σ)
 end
 
+@testset "Relevance Pursuit" begin
+    using Optimization: NRP, nrp
+    n, m, k = 32, 64, 4
+    σ = 1e-6
+    A, x, b = sparse_data(n = n, m = m, k = k, σ = σ)
+    xrp = nrp(A, b, k)
+    # noiseless
+    @test xrp.nzind == x.nzind
+    @test xrp.nzval ≈ x.nzval
+
+    σ = 1e-2 # slightly noisy
+    @. b += σ*randn()
+    xrp = nrp(A, b, k)
+    # noiseless
+    @test xrp.nzind == x.nzind
+    @test isapprox(xrp.nzval, x.nzval, atol = 5σ)
+end
+
 @testset "Sparse Bayesian Learning" begin
     n, m, k = 32, 64, 3
     σ = 1e-2
@@ -87,8 +105,8 @@ end
 @testset "Basis Pursuit" begin
     using Optimization: basispursuit, candes_reweighting, ard_reweighting
     # equality constrained l1 minimization
-    n, m = 16, 64
-    k = 3
+    n, m = 32, 64
+    k = 8
     σ = 0.
     A, x, b = sparse_data(n = n, m = m, k = k, σ = σ, normalized = true)
     xl = basispursuit(A, b)

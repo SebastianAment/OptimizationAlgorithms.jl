@@ -12,7 +12,7 @@ struct MatchingPursuit{T, AT<:AbstractMatrix{T}, B<:AbstractVector{T}} <: Abstra
     # temporary storage
     r::B # residual
     Ar::B # inner products between measurement matrix and residual
-    # a approximation
+    # a approximation # can be updated efficiently
 end
 const MP = MatchingPursuit
 function MP(A::AbstractMatrix, b::AbstractVector, k::Integer)
@@ -24,7 +24,7 @@ end
 
 function update!(P::MP, x::AbstractVector = spzeros(size(P.A, 2)))
     nnz(x) ≥ P.k && return x # return if the maximum number of non-zeros was reached
-    residual!(P, x) # TODO: could avoid calculating residual and just update it and approximation
+    residual!(P, x) # TODO: could just update approximation directly for mp
     i = maxabsdot!(P)
     x[i] += dot(@view(P.A[:,i]), P.r) # add non-zero index to x
     return x
@@ -136,11 +136,69 @@ function sp(A::AbstractMatrix, b::AbstractVector, k::Int; iter = 8)
     return x
 end
 
+######################### Noiseless Relevance Pursuit ##########################
+using LinearAlgebraExtensions: Projection, AbstractMatOrFac
+# noiseless limit of greedy sbl
+struct NoiselessRelevancePursuit{T, AT<:AbstractMatrix{T}, B<:AbstractVector{T}} <: AbstractPursuit{T}
+    A::AT
+    b::B
+    # σ::T # noise standard deviation
+
+    k::Int # maximum number of non-zeros
+
+    # temporary storage
+    r::B # residual
+    Ar::B # inner products between measurement matrix and residual
+    Ai::AT # space for A[:, x.nzind] and its qr factorization
+end
+const NRP = NoiselessRelevancePursuit
+
+function NRP(A::AbstractMatrix, b::AbstractVector, k::Int)
+    n, m = size(A)
+    T = eltype(A)
+    r, Ar = zeros(T, n), zeros(T, m)
+    Ai = zeros(T, (n, k))
+    NRP(A, b, k, r, Ar, Ai)
+end
+
+function residual_operator(A::AbstractMatOrFac)
+    I - Matrix(Projection(A))
+end
+
+function update!(P::NRP, x::AbstractVector = spzeros(size(P.A, 2)))
+    Ai = P.A[:, x.nzind]
+    D = residual_operator(Ai)
+    AD = P.A' * D
+    q = AD * P.b
+    s = @views [sqrt(max(0, dot(AD[i,:], P.A[:,i]))) for i in 1:size(P.A, 2)]
+
+    inner = @. abs(q / s)
+    @. inner[x.nzind] = 0
+
+    i = argmax(inner)
+    x[i] = NaN # add non-zero index to x
+    solve!(P, x) # optimize all active atoms
+    return x
+end
+
+# calculates k-sparse approximation to Ax = b via relevance pursuit
+function nrp(A::AbstractMatrix, b::AbstractVector, k::Int)
+    P! = NRP(A, b, k)
+    x = spzeros(size(A, 2))
+    for i in 1:k
+        P!(x)
+    end
+    return x
+end
+
 ####################### Pursuit Helpers ########################################
 # calculates residual of
 @inline function residual!(P::AbstractPursuit, x::AbstractVector)
-    copyto!(P.r, P.b)
-    mul!(P.r, P.A, x, -1, 1)
+    residual!(P.r, P.A, x, P.b)
+end
+@inline function residual!(r::AbstractVector, A::AbstractMatrix, x::AbstractVector, b::AbstractVector)
+    copyto!(r, b)
+    mul!(r, A, x, -1, 1)
 end
 # returns index of atom with largest dot product with residual
 @inline function maxabsdot!(P::AbstractPursuit) # 0 alloc
@@ -155,6 +213,7 @@ end
     @. Ai = @view(P.A[:, x.nzind])
     return qr!(Ai) # this still allocates a little memory
 end
+# ordinary least squares solve
 @inline function solve!(P::AbstractPursuit, x::AbstractVector)
     F = _factorize!(P, x)
     ldiv!(x.nzval, F, P.b)     # optimize all active atoms
@@ -181,4 +240,93 @@ end
 # function uncenter(x::AbstractVecOrMat, μ, σ)
 #     @. x = x * σ + μ
 #     x, y
+# end
+
+
+############################## Relevance Pursuit ###############################
+# eh
+# using LinearAlgebraExtensions: Projection, AbstractMatOrFac
+# # noiseless limit of greedy sbl
+# struct RelevancePursuit{T, AT<:AbstractMatrix{T}, B<:AbstractVector{T},
+#         G<:AbstractVector{T}} <: AbstractPursuit{T}
+#     A::AT
+#     b::B
+#     σ::T # noise standard deviation
+#     γ::G # prior variance of weights
+#     # k::Int # maximum number of non-zeros
+#     # temporary storage
+#     # r::B # residual
+#     # Ar::B # inner products between measurement matrix and residual
+#     # Ai::AT # space for A[:, x.nzind] and its qr factorization
+# end
+# const RP = RelevancePursuit
+#
+# function RP(A::AbstractMatrix, b::AbstractVector, σ::Real)
+#     n, m = size(A)
+#     T = eltype(A)
+#     # r, Ar = zeros(T, n), zeros(T, m)
+#     # Ai = zeros(T, (n, k))
+#     γ = spzeros(T, m)
+#     RP(A, b, σ, γ)
+# end
+#
+# function update!(P::RP, x::AbstractVector = spzeros(size(P.A, 2)))
+#     isin = P.γ.nzind
+#     if length(isin) > 0
+#         γi = P.γ.nzval
+#         Ai = P.A[:, isin]
+#         println(size(γi))
+#         println(size(Ai))
+#         # println(inverse(factorize(P.σ^2 * Diagonal(inv.(γi)) + Ai'Ai)))
+#         # D = Woodbury(I(length(isin)), Ai,
+#         #             inverse(factorize(P.σ^2 * Diagonal(inv.(γi)) + Ai'Ai)),
+#         #             Ai', -)
+#         D = factorize(
+#                 Woodbury(I(length(P.b)), Ai, Diagonal(inv.(γi/P.σ^2)), Ai')
+#             )
+#     else
+#         D = I
+#     end
+#
+#     AD = P.A' * D
+#     q = AD * P.b
+#     s = @views [sqrt(max(0, dot(AD[i,:], P.A[:,i]))) for i in 1:size(P.A, 2)]
+#
+#     inner = @. abs(q / s)
+#     # if length(isin) > 0
+#     #     minvalue, minindex = findmin(inner[isin])
+#     #     if minvalue ≤ P.σ
+#     #         P.γ[minindex] = 0
+#     #         x[minindex] = 0
+#     #         dropzeros!(P.γ)
+#     #         dropzeros!(x)
+#     #         return x
+#     #     end
+#     # end
+#     inner[isin] .= 0
+#     println(inner)
+#     maxvalue, maxindex = findmax(inner)
+#     println("maxvalue = $maxvalue")
+#     println("maxindex = $maxindex")
+#     println(P.γ)
+#     if maxvalue > P.σ
+#         P.γ[maxindex] = ((q[maxindex]/s[maxindex])^2 - 1) / s[maxindex]^2 # (q^2 - s^2) / s^4
+#         x[maxindex] = NaN # add non-zero index to x
+#         isin = P.γ.nzind
+#         γi = P.γ.nzval
+#         Ai = P.A[:, isin]
+#         C = cholesky!(P.σ^2 * Diagonal(inv.(γi)) + Ai'Ai)
+#         ldiv!(x.nzval, C, Ai' * P.b)
+#     end
+#     return x
+# end
+#
+# # calculates k-sparse approximation to Ax = b via relevance pursuit
+# function rp(A::AbstractMatrix, b::AbstractVector, σ::Real; maxiter = size(A, 1))
+#     P! = RelevancePursuit(A, b, σ)
+#     x = spzeros(size(A, 2))
+#     for i in 1:maxiter
+#         P!(x)
+#     end
+#     return x
 # end
