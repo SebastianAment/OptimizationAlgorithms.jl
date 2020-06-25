@@ -3,7 +3,7 @@ using Test
 using LinearAlgebra
 using Optimization
 using Optimization: Gradient, ScaledGradient, StoppingCriterion, fixedpoint!
-using Optimization: PolyakMomentum, Nesterov, Adam
+using Optimization: PolyakMomentum, Nesterov, ADAM, AMSGRAD
 using ForwardDiff: gradient
 
 @testset "PolyakMomentum" begin
@@ -13,8 +13,10 @@ using ForwardDiff: gradient
     μ = randn(n)
     f(x) = (x-μ)'A*(x-μ)
     x = randn(n)
-    G = ScaledGradient(f, x)
-    G = PolyakMomentum(G, copy(x), .5)
+    G = Gradient(f, x)
+    α = .1
+    β = .5
+    G = PolyakMomentum(G, copy(x), α, β)
     ε = 1e-6
     fixedpoint!(G, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
@@ -28,10 +30,46 @@ end
     μ = randn(n)
     f(x) = (x-μ)'A*(x-μ)
     x = randn(n)
-    G = ScaledGradient(f, x)
-    G = Nesterov(G, copy(x), 1., .01)
+    α = .1
+    β = .5
+    G = Gradient(f, x)
+    G = Nesterov(G, x, α, β)
     ε = 1e-6
     fixedpoint!(G, x, StoppingCriterion(x, dx = 1e-2ε))
+    @test norm(gradient(f, x)) < ε
+end
+
+@testset "ADAM" begin
+    n = 2
+    A = randn(n, n)
+    A = A'A + I
+    μ = randn(n)
+    f(x) = (x-μ)'A*(x-μ)
+    x = randn(n)
+    G = Gradient(f, x)
+    α = .1
+    β₁ = 0.5
+    β₂ = 0.999 # this should be large
+    G = ADAM(G, x, α, β₁, β₂)
+    ε = 1e-6
+    fixedpoint!(G, x, StoppingCriterion(x, dx = 1e-2ε, maxiter = 256))
+    @test norm(gradient(f, x)) < ε
+end
+
+@testset "AMSGRAD" begin
+    n = 2
+    A = randn(n, n)
+    A = A'A + I
+    μ = randn(n)
+    f(x) = (x-μ)'A*(x-μ)
+    x = randn(n)
+    G = Gradient(f, x)
+    α = .1
+    β₁ = 0.5
+    β₂ = 0.999 # this should be large
+    G = AMSGRAD(G, x, α, β₁, β₂)
+    ε = 1e-6
+    fixedpoint!(G, x, StoppingCriterion(x, dx = 1e-2ε, maxiter = 256))
     @test norm(gradient(f, x)) < ε
 end
 

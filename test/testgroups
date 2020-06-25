@@ -1,7 +1,6 @@
 util
 descentdirections
 descentupdates
-compressedsensing
 linearsolvers
 stepsize
 submodular
