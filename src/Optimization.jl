@@ -57,6 +57,7 @@ end
 optimize!(f!, x) = optimize!(f!, x, StoppingCriterion(x))
 
 ########################### Stopping Criterion ##################################
+# TODO: add verbose option
 # abstract type StoppingCriterion{T} end
 mutable struct StoppingCriterion{T, S}
     x::T # holds last value of parameters

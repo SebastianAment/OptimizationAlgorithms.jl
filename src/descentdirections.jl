@@ -92,7 +92,7 @@ function valdir(N::SaddleFreeNewton, x::AbstractVector)
         ldiv!(N.d, C, ∇)
     catch PosDefException # otherwise, calculate matrix absolute value
         E = eigen!(H)
-        @. E.values = max(abs(E.values), E.min_eigval)
+        @. E.values = max(abs(E.values), N.min_eigval)
         ldiv!(N.d, E, ∇)
     end
     N.d .*= -1

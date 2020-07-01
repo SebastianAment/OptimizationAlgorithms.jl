@@ -16,7 +16,7 @@ f(x) = (x-μ)'A*(x-μ)
     G = Optimization.Gradient(f, x)
     U = Optimization.DecreasingStep(G, x)
     ε = 1e-6
-    fixedpoint!(U, x, StoppingCriterion(x, dx = 1e-2ε))
+    fixedpoint!(U, x, StoppingCriterion(x, dx = 1e-2ε, maxiter = 256))
     @test norm(gradient(f, x)) < ε
 end
 
@@ -25,7 +25,7 @@ end
     G = Optimization.Gradient(f, x)
     U = Optimization.ArmijoStep(G, x)
     ε = 1e-6
-    fixedpoint!(U, x, StoppingCriterion(x, dx = 1e-2ε))
+    fixedpoint!(U, x, StoppingCriterion(x, dx = 1e-2ε, maxiter = 256))
     @test norm(gradient(f, x)) < ε
 end
 
