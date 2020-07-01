@@ -91,9 +91,9 @@ function valdir(N::SaddleFreeNewton, x::AbstractVector)
         C = cholesky!(H)
         ldiv!(N.d, C, ∇)
     catch PosDefException # otherwise, calculate matrix absolute value
-        E = eigen!(H)
+        E = eigen!(Symmetric(H))
         @. E.values = max(abs(E.values), N.min_eigval)
-        ldiv!(N.d, E, ∇)
+        LinearAlgebraExtensions.ldiv!!(N.d, E, ∇) # overwrites both N.d and ∇, and stores result in N.d
     end
     N.d .*= -1
     return DiffResults.value(N.r), N.d

@@ -2,6 +2,7 @@ module Optimization
 
 using LinearAlgebra
 using Metrics
+using LinearAlgebraExtensions
 using LinearAlgebraExtensions: difference, LazyDifference
 
 # define euclidean metric

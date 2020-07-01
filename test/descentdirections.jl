@@ -3,8 +3,8 @@ module TestDescentDirections
 using LinearAlgebra
 using Test
 using Optimization
-using Optimization: fixedpoint!, StoppingCriterion
-using ForwardDiff: derivative, gradient
+using Optimization: fixedpoint!, StoppingCriterion, update!
+using ForwardDiff: derivative, gradient, hessian
 
 # TODO: separate test problems from algorithms
 # TODO: tests for GaussNewton, NaturalGradient
@@ -70,6 +70,14 @@ end
     SFN = Optimization.SaddleFreeNewton(f, x)
     fixedpoint!(SFN, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
+
+    # test non-convex iteration
+    f(x) = sum(cos, x)
+    x = 1e-6randn(n)
+    SFN = Optimization.SaddleFreeNewton(f, x)
+    fixedpoint!(SFN, x, StoppingCriterion(x, dx = 1e-2ε))
+    @test norm(gradient(f, x)) < ε
+    @test isposdef(hessian(f, x)) # not a saddle point or local maximum
 end
 
 
