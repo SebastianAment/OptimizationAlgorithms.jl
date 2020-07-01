@@ -7,7 +7,7 @@ using Optimization: fixedpoint!, StoppingCriterion
 using ForwardDiff: derivative, gradient
 
 # TODO: separate test problems from algorithms
-# TODO: tests for GaussNewton, Momentum ADAM, NaturalGradient, Nesterov
+# TODO: tests for GaussNewton, NaturalGradient
 @testset "gradient descent" begin
     n = 2
     A = randn(n, n)
@@ -51,12 +51,24 @@ end
     x += N(x)
     @test norm(gradient(f, x)) < ε
 
+    # saddle-free Newton
+    x = randn(n)
+    SFN = Optimization.SaddleFreeNewton(f, x)
+    x += SFN(x)
+    @test norm(gradient(f, x)) < ε
+
     # higher-dimensional non-quadratic
     f(x) = 1/2*(x-μ)'A*(x-μ) - sum(x->log(abs2(x)), x)
+
     x = 2randn(n)
     N = Optimization.Newton(f, x)
     ε = 1e-6
     fixedpoint!(N, x, StoppingCriterion(x, dx = 1e-2ε))
+    @test norm(gradient(f, x)) < ε
+
+    x = 2randn(n)
+    SFN = Optimization.SaddleFreeNewton(f, x)
+    fixedpoint!(SFN, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
 end
 

@@ -31,24 +31,32 @@ end
 direction(G::Gradient, x::AbstractArray) = valdir(G, x)[2]
 
 ################################################################################
+using ForwardDiff: DerivativeConfig, HessianConfig
 # newton's method for scalar-valued, vector-input functions
-struct Newton{T, F, V, R} <: Direction{T}
+struct Newton{T, F, V, R, C} <: Direction{T}
     f::F
     d::V # direction
     r::R # differentiation result
-    # λ::T # LevenbergMarquart parameter
-    function Newton(f::F, x::V) where {T<:Number, V<:Union{T, AbstractVector{<:T}}, F}
-        r = V <: Number ? DiffResult(x, (one(x),)) : HessianResult(x)
-        new{T, F, V, typeof(r)}(f, zero(x), r)
+    cfg::C # hessian config
+    function Newton(f, x::AbstractVector)
+        r = HessianResult(x)
+        cfg = HessianConfig(f, r, x)
+        new{eltype(x), typeof(f), typeof(x), typeof(r), typeof(cfg)}(f, zero(x), r, cfg)
+    end
+    function Newton(f, x::Number)
+        r = DiffResult(x, (one(x),))
+        cfg = nothing
+        new{eltype(x), typeof(f), typeof(x), typeof(r), typeof(cfg)}(f, zero(x), r, cfg)
     end
 end
-# TODO: specialize factorization of hessian
+# specialize factorization of hessian?
 # cholesky only if problem is p.d. (constraint optimization with Lagrange multipliers isn't)
+# see SaddleFreeNewton below for a more robust method
 function valdir(N::Newton, x::AbstractVector)
-    hessian!(N.r, N.f, x)
+    hessian!(N.r, N.f, x, N.cfg) # this still allocates a little
     ∇ = DiffResults.gradient(N.r)
     H = DiffResults.hessian(N.r)
-    H = cholesky(H)
+    H = cholesky!(H)
     ldiv!(N.d, H, ∇)
     N.d .*= -1
     return DiffResults.value(N.r), N.d
@@ -62,9 +70,38 @@ function valdir(N::Newton, x::Real)
     return N.f(x), step
 end
 
+struct SaddleFreeNewton{T, F, V, R, C<:HessianConfig} <: Direction{T}
+    f::F
+    d::V # direction
+    r::R # differentiation result
+    cfg::C # hessian config
+    min_eigval::T
+    function SaddleFreeNewton(f, x::V; min_eigval = 1e1eps(T)) where {T<:Number,
+                                            V<:Union{T, AbstractVector{<:T}}}
+        r = V <: Number ? DiffResult(x, (one(x),)) : HessianResult(x)
+        cfg = HessianConfig(f, r, x)
+        new{T, typeof(f), V, typeof(r), typeof(cfg)}(f, zero(x), r, cfg, min_eigval)
+    end
+end
+function valdir(N::SaddleFreeNewton, x::AbstractVector)
+    hessian!(N.r, N.f, x, N.cfg) # this still allocates a little
+    ∇ = DiffResults.gradient(N.r)
+    H = DiffResults.hessian(N.r)
+    try # if Hessian is p.d., cholesky is much more efficient
+        C = cholesky!(H)
+        ldiv!(N.d, C, ∇)
+    catch PosDefException # otherwise, calculate matrix absolute value
+        E = eigen!(H)
+        @. E.values = max(abs(E.values), E.min_eigval)
+        ldiv!(N.d, E, ∇)
+    end
+    N.d .*= -1
+    return DiffResults.value(N.r), N.d
+end
+
 ################################################################################
 # Diagonal approximation to Hessian
-# could also approximate 2nd derivatives as we go along
+# could also approximate 2nd derivatives as we go along like LBFGS
 struct ScaledGradient{T, F, V, R} <: Direction{T}
     f::F
     d::V # direction
@@ -107,6 +144,8 @@ function valdir(G::GaussNewton, x::AbstractVector)
     N.d .*= -1
     return sum(abs2, y), N.d # since GaussNewton is for least-squares
 end
+
+# TODO: LevenbergMarquart ...
 
 ################################################################################
 # Broyden-Fletcher-Goldfarb-Shanno algorithm
