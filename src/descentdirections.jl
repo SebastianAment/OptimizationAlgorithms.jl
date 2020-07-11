@@ -1,10 +1,9 @@
 ########################## Auto-Differentiation Setup ##########################
-# TODO: generalize from ForwardDiff
 # using ForwardDiff for most algorithms if no explicit descent direction is given
-import ForwardDiff: derivative, derivative!, gradient, gradient!,
-    jacobian, jacobian!, hessian, hessian!
 using ForwardDiff
 const FD = ForwardDiff
+import ForwardDiff: derivative, derivative!, gradient, gradient!,
+    jacobian, jacobian!, hessian, hessian!
 
 using DiffResults
 using DiffResults: DiffResult, GradientResult, HessianResult
@@ -31,7 +30,7 @@ end
 direction(G::Gradient, x::AbstractArray) = valdir(G, x)[2]
 
 ################################################################################
-using ForwardDiff: DerivativeConfig, HessianConfig
+using ForwardDiff: DerivativeConfig, HessianConfig, JacobianConfig
 # newton's method for scalar-valued, vector-input functions
 struct Newton{T, F, V, R, C} <: Direction{T}
     f::F
@@ -76,7 +75,7 @@ struct SaddleFreeNewton{T, F, V, R, C<:HessianConfig} <: Direction{T}
     r::R # differentiation result
     cfg::C # hessian config
     min_eigval::T
-    function SaddleFreeNewton(f, x::V; min_eigval = 1e1eps(T)) where {T<:Number,
+    function SaddleFreeNewton(f, x::V; min_eigval = sqrt(eps(T))) where {T<:Number,
                                             V<:Union{T, AbstractVector{<:T}}}
         r = V <: Number ? DiffResult(x, (one(x),)) : HessianResult(x)
         cfg = HessianConfig(f, r, x)
@@ -121,31 +120,6 @@ function valdir(N::ScaledGradient, x::AbstractVector)
     @. N.d = -1 * ∇ / max(abs(Δ), ε)
     return DiffResults.value(N.r), N.d
 end
-
-################################################################################
-# Gauss-Newton algorithm, minimizes sum of squares of vector-valued function f w.r.t. x
-# n, m = length(f(x)), length(x) # in case we want to pre-allocate the jacobian
-struct GaussNewton{T, F, D, R} <: Direction{T}
-    f::F
-    d::D
-    r::R
-    function GaussNewton(f::F, x::V, y::V) where {T, V<:AbstractVector{T}, F<:Function}
-        r = DiffResults.JacobianResult(y, x)
-        new{T, F, V, typeof(r)}(f, similar(x), r)
-    end
-end
-objective(G::GaussNewton) = x -> sum(abs2, f(x))
-function valdir(G::GaussNewton, x::AbstractVector)
-    jacobian!(G.r, G.f, x)
-    y = DiffResults.value(G.r)
-    J = DiffResults.jacobian(G.r)
-    J = qr(J)
-    ldiv!(N.d, J, ∇)
-    N.d .*= -1
-    return sum(abs2, y), N.d # since GaussNewton is for least-squares
-end
-
-# TODO: LevenbergMarquart ...
 
 ################################################################################
 # Broyden-Fletcher-Goldfarb-Shanno algorithm

@@ -1,5 +1,6 @@
 util
 descentdirections
+gaussnewton
 descentupdates
 linearsolvers
 stepsize

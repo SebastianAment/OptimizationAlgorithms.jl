@@ -8,6 +8,7 @@ using LinearAlgebraExtensions: difference, LazyDifference
 # define euclidean metric
 const euclidean = Metrics.EuclideanMetric()
 
+# TODO: primal and primal-dual barrier methods
 # TODO: update_value!: updates input and returns value of updated input
 # TODO: pretty-print of statistics of optimization run (number of steps, objective function history, etc.)
 # TODO: all directions are time-indpendent, except ADAM if interpreted as direction
@@ -139,6 +140,7 @@ const valdir = value_direction
 ################################################################################
 include("util.jl")
 include("descentdirections.jl")
+include("gaussnewton.jl")
 include("descentupdates.jl")
 include("stochastic.jl")
 include("linearsolvers.jl")
