@@ -66,12 +66,12 @@ function lm_scaling!(JJ::AbstractMatrix, λ::Real)
 end
 
 # TODO: put settings in struct?
-function optimize!(LM::LevenbergMarquart, x::AbstractVector; maxiter = 128,
+function optimize!(LM::LevenbergMarquart, x::AbstractVector; maxiter::Int = 128,
                 min_decrease = 1e-8, increase_factor = 3, decrease_factor = 2)
     λ = 1e-6
     oldx = copy(x)
     for i in 1:maxiter
-        val, dx = valdir(LM, x, λ)
+        val, dx = valdir(LM, oldx, λ)
         @. x = oldx + dx
         newval = value(LM, x)
         if newval > val
