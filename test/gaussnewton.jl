@@ -2,7 +2,7 @@ module TestGaussNewton
 
 using Test
 using Optimization
-using Optimization: GaussNewton, LevenbergMarquart #gaussnewton, levenbergmarquart
+using Optimization: GaussNewton, LevenbergMarquart, DecreasingStep
 using Optimization: update!, optimize!
 
 function test_problem(n)
@@ -23,6 +23,14 @@ end
     ab = ab0 + σ*randn(2)
     for i in 1:16
         update!(G, ab)
+    end
+    tol = 1e-8
+    @test isapprox(ab, ab0, atol = tol)
+
+    D = DecreasingStep(G, ab)
+    ab = ab0 + σ*randn(2)
+    for i in 1:16
+        update!(D, ab)
     end
     tol = 1e-8
     @test isapprox(ab, ab0, atol = tol)

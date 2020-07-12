@@ -12,6 +12,7 @@ struct GaussNewton{T, F, D, R, C} <: Direction{T}
         new{T, F, V, typeof(r), typeof(cfg)}(f, similar(x), r, cfg)
     end
 end
+
 function valdir(G::GaussNewton, x::AbstractVector)
     y = DiffResults.value(G.r)
     jacobian!(G.r, G.f, y, x, G.cfg)
@@ -39,7 +40,7 @@ struct LevenbergMarquart{T, F, D, R, C, JT} <: Direction{T}
     end
 end
 
-function value(LM::LevenbergMarquart, x::AbstractVector)
+function objective(LM::Union{GaussNewton, LevenbergMarquart}, x::AbstractVector)
     y = DiffResults.value(LM.r)
     LM.f(y, x)
     sum(abs2, y)
@@ -67,14 +68,14 @@ end
 
 # TODO: put settings in struct?
 function optimize!(LM::LevenbergMarquart, x::AbstractVector; maxiter::Int = 128,
-                min_decrease = 1e-8, increase_factor = 3, decrease_factor = 2)
-    λ = 1e-6
+                min_decrease::Real = 1e-8, max_step::Real = Inf, λ::Real = 1.,
+                increase_factor::Real = 3, decrease_factor::Real = 2)
     oldx = copy(x)
     for i in 1:maxiter
         val, dx = valdir(LM, oldx, λ)
         @. x = oldx + dx
-        newval = value(LM, x)
-        if newval > val || isnan(newval)
+        newval = objective(LM, x)
+        if newval > val || isnan(newval) || any(x->abs(x) > max_step, dx)
             λ *= increase_factor
             continue
         elseif abs(newval - val) < min_decrease
