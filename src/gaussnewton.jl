@@ -74,7 +74,7 @@ function optimize!(LM::LevenbergMarquart, x::AbstractVector; maxiter::Int = 128,
         val, dx = valdir(LM, oldx, λ)
         @. x = oldx + dx
         newval = value(LM, x)
-        if newval > val
+        if newval > val || isnan(newval)
             λ *= increase_factor
             continue
         elseif abs(newval - val) < min_decrease
