@@ -1,30 +1,74 @@
+abstract type AbstractGaussNewton{T} <: Direction{T} end
+
+function objective(GN::AbstractGaussNewton, x::AbstractVector)
+    y = DiffResults.value(GN.r)
+    GN.f(y, x)
+    sum(abs2, y)
+end
+
+function get_value_jacobian(GN::AbstractGaussNewton)
+    return DiffResults.value(GN.r), DiffResults.jacobian(GN.r)
+end
+
+function update_jacobian!(GN::AbstractGaussNewton, x::AbstractVector)
+    y, J = get_value_jacobian(GN)
+    jacobian!(GN.r, GN.f, y, x, GN.cfg) # constant allocation
+    return y, J
+end
+
+# update_jacobian! needs to be called prior to update_direction for correctness
+function update_direction!(GN::AbstractGaussNewton, λ::Real, min_diagonal::Real = 1e-12)
+    y, J = get_value_jacobian(GN)
+    mul!(GN.d, J', y)
+    mul!(GN.JJ, J', J)
+    lm_scaling!(GN.JJ, λ, min_diagonal)
+    C = cholesky!(GN.JJ) # constant allocation
+    ldiv!(C, GN.d)
+    GN.d .*= -1
+    return sum(abs2, y), GN.d
+end
+
+function lm_scaling!(JJ::AbstractMatrix, λ::Real, min_diagonal::Real = 1e-12)
+    for i in diagind(JJ)
+        JJ[i] = max(JJ[i] * (1+λ), min_diagonal)
+    end
+    JJ
+end
+
 ################################################################################
 # Gauss-Newton algorithm, minimizes sum of squares of vector-valued function f w.r.t. x
-# n, m = length(f(x)), length(x) # in case we want to pre-allocate the jacobian
-struct GaussNewton{T, F, D, R, C} <: Direction{T}
+struct GaussNewton{T, F, D, R, C, JT} <: AbstractGaussNewton{T}
     f::F
     d::D
     r::R
     cfg::C
+    JJ::JT
     function GaussNewton(f::F, x::V, y::V) where {T, V<:AbstractVector{T}, F<:Function}
+        d = similar(x)
         r = DiffResults.JacobianResult(y, x)
         cfg = JacobianConfig(f, y, x)
-        new{T, F, V, typeof(r), typeof(cfg)}(f, similar(x), r, cfg)
+        J = DiffResults.jacobian(r)
+        JJ = J'J
+        new{T, F, V, typeof(r), typeof(cfg), typeof(JJ)}(f, d, r, cfg, JJ)
     end
 end
 
-function valdir(G::GaussNewton, x::AbstractVector)
-    y = DiffResults.value(G.r)
-    jacobian!(G.r, G.f, y, x, G.cfg)
-    J = DiffResults.jacobian(G.r)
-    ldiv!(G.d, qr!(J), y)
-    G.d .*= -1
-    return sum(abs2, y), G.d
+# using qr factorization instead of cholesky of normal equations
+function valdir(GN::GaussNewton, x::AbstractVector, qr::Val{true})
+    y, J = update_jacobian!(GN, x)
+    ldiv!(GN.d, qr!(J), y)
+    GN.d .*= -1
+    return sum(abs2, y), GN.d
+end
+
+function valdir(GN::GaussNewton, x::AbstractVector, min_diagonal::Real = 1e-12)
+    update_jacobian!(GN, x)
+    update_direction!(GN, 0, min_diagonal)
 end
 
 ################################################################################
 # TODO: geodesic acceleration (see https://en.wikipedia.org/wiki/Levenberg–Marquardt_algorithm)
-struct LevenbergMarquart{T, F, D, R, C, JT} <: Direction{T}
+struct LevenbergMarquart{T, F, D, R, C, JT} <: AbstractGaussNewton{T}
     f::F
     d::D
     r::R
@@ -40,42 +84,23 @@ struct LevenbergMarquart{T, F, D, R, C, JT} <: Direction{T}
     end
 end
 
-function objective(LM::Union{GaussNewton, LevenbergMarquart}, x::AbstractVector)
-    y = DiffResults.value(LM.r)
-    LM.f(y, x)
-    sum(abs2, y)
-end
-
-function valdir(LM::LevenbergMarquart, x::AbstractVector, λ::Real = 1e-6)
-    y = DiffResults.value(LM.r)
-    jacobian!(LM.r, LM.f, y, x, LM.cfg) # constant allocation
-    J = DiffResults.jacobian(LM.r)
-    mul!(LM.d, J', y)
-    mul!(LM.JJ, J', J)
-    lm_scaling!(LM.JJ, λ)
-    C = cholesky!(LM.JJ) # constant allocation
-    ldiv!(C, LM.d) # using y as a temporary
-    LM.d .*= -1
-    return sum(abs2, y), LM.d # since LevenbergMarquart is for least-squares
-end
-# const LM = LevenbergMarquart
-function lm_scaling!(JJ::AbstractMatrix, λ::Real)
-    for i in diagind(JJ)
-        JJ[i] += λ * JJ[i]
-    end
-    JJ
+function valdir(LM::LevenbergMarquart, x::AbstractVector, λ::Real, min_diagonal::Real = 1e-12)
+    update_jacobian!(LM, x)
+    update_direction!(LM, λ, min_diagonal)
 end
 
 # TODO: put settings in struct?
 function optimize!(LM::LevenbergMarquart, x::AbstractVector; maxiter::Int = 128,
                 min_decrease::Real = 1e-8, max_step::Real = Inf, λ::Real = 1.,
-                increase_factor::Real = 3, decrease_factor::Real = 2)
+                increase_factor::Real = 3, decrease_factor::Real = 2,
+                min_diagonal::Real = 1e-12)
     oldx = copy(x)
+    update_jacobian!(LM, oldx)
     for i in 1:maxiter
-        val, dx = valdir(LM, oldx, λ)
+        val, dx = update_direction!(LM, λ, min_diagonal)
         @. x = oldx + dx
         newval = objective(LM, x)
-        if newval > val || isnan(newval) || any(x->abs(x) > max_step, dx)
+        if newval > val || isnan(newval) || any(x->abs(x) > max_step, dx) # might be easier to read with nested loop
             λ *= increase_factor
             continue
         elseif abs(newval - val) < min_decrease
@@ -83,6 +108,7 @@ function optimize!(LM::LevenbergMarquart, x::AbstractVector; maxiter::Int = 128,
         end
         val = newval
         copy!(oldx, x)
+        update_jacobian!(LM, oldx)
         λ /= decrease_factor
     end
     return x
