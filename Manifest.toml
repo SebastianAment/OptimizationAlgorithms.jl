@@ -8,9 +8,9 @@ version = "0.5.0"
 
 [[ArrayLayouts]]
 deps = ["FillArrays", "LinearAlgebra"]
-git-tree-sha1 = "a3254b3780a3544838ca0b7e23b1e9b06eb71bd8"
+git-tree-sha1 = "6f6e33efac70fc24c1f2a654a090b7af01690ffe"
 uuid = "4c555306-a7a7-4459-81d9-ec55ddd5c99a"
-version = "0.3.5"
+version = "0.3.7"
 
 [[Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
@@ -164,9 +164,9 @@ version = "3.3.9+5"
 
 [[FillArrays]]
 deps = ["LinearAlgebra", "Random", "SparseArrays"]
-git-tree-sha1 = "4783bbbeade37f2a8bd82af6c112510fde78e532"
+git-tree-sha1 = "be4180bdb27a11188d694ee3773122f4921f1a62"
 uuid = "1a297f60-69ca-5386-bcde-b61e274b549b"
-version = "0.8.12"
+version = "0.8.13"
 
 [[ForwardDiff]]
 deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "NaNMath", "Random", "SpecialFunctions", "StaticArrays"]
@@ -176,9 +176,9 @@ version = "0.10.12"
 
 [[GR]]
 deps = ["Base64", "DelimitedFiles", "HTTP", "JSON", "LinearAlgebra", "Printf", "Random", "Serialization", "Sockets", "Test", "UUIDs"]
-git-tree-sha1 = "247adbd2b33c0c4b42efa20d1e807acf6312145f"
+git-tree-sha1 = "e26c513329675092535de20cc4bb9c579c8f85a0"
 uuid = "28b8d3ca-fb5f-59d9-8090-bfdbd6d07a71"
-version = "0.50.1"
+version = "0.51.0"
 
 [[HTTP]]
 deps = ["Base64", "Dates", "IniFile", "MbedTLS", "Sockets"]
@@ -209,10 +209,10 @@ deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 
 [[Intervals]]
-deps = ["Dates", "Printf", "RecipesBase", "TimeZones"]
-git-tree-sha1 = "6cb8eeae36aa58b35d5e41d71be5cd67bc6fca87"
+deps = ["Dates", "Printf", "RecipesBase", "Serialization", "TimeZones"]
+git-tree-sha1 = "8ffd41e6ddb0b569744aac36f8f5a4c92d28fc9e"
 uuid = "d8418881-c3e1-53bb-8760-2df7ec849ed5"
-version = "1.3.4"
+version = "1.4.0"
 
 [[IterTools]]
 git-tree-sha1 = "05110a2ab1fc5f932622ffea2a003221f4782c18"
@@ -246,8 +246,8 @@ uuid = "b3329135-7958-41d4-bb02-e084c5a526bf"
 version = "0.1.0"
 
 [[KroneckerProducts]]
-deps = ["LazyInverse", "LinearAlgebra", "Random", "Test"]
-git-tree-sha1 = "98f4a073bf302230d3b67717810c3c18f664f714"
+deps = ["LazyInverse", "LinearAlgebra", "LinearAlgebraExtensions", "Random", "Test"]
+git-tree-sha1 = "eacddc60f9dcce6798ce77b565b5ad0a8788b8b8"
 repo-rev = "master"
 repo-url = "https://github.com/SebastianAment/KroneckerProducts.jl.git"
 uuid = "1b19e153-50d3-4699-8064-93bcb9fb4fba"
@@ -255,9 +255,9 @@ version = "0.1.0"
 
 [[LazyArrays]]
 deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra", "MacroTools", "MatrixFactorizations", "StaticArrays"]
-git-tree-sha1 = "8e28ab1a89977586a42a3c48ecb9ffd69cb7ccf6"
+git-tree-sha1 = "b8ae23618bb217f8ec300dafac8422293abc1620"
 uuid = "5078a376-72f3-5289-bfd5-ec5146d43c02"
-version = "0.16.14"
+version = "0.16.15"
 
 [[LazyInverse]]
 deps = ["LinearAlgebra", "Test"]
@@ -286,7 +286,7 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[LinearAlgebraExtensions]]
 deps = ["FFTW", "InfiniteArrays", "LazyArrays", "LazyInverse", "LinearAlgebra", "StatsBase", "Test"]
-git-tree-sha1 = "3b2a03acc67bb0bb198efeab6c0833995145577e"
+git-tree-sha1 = "4145a01c98fc4435dda690291390492809d0ee1d"
 repo-rev = "master"
 repo-url = "https://github.com/SebastianAment/LinearAlgebraExtensions.jl.git"
 uuid = "cb114d4a-f1bd-499c-ad9e-7f2ed74575b9"
@@ -325,9 +325,9 @@ version = "0.7.8"
 
 [[MatrixFactorizations]]
 deps = ["ArrayLayouts", "LinearAlgebra", "Random"]
-git-tree-sha1 = "69454f168628adeff74264837fc4c9d258dcc444"
+git-tree-sha1 = "17eb65dfd08ea0a4b3b297916429f4e043f79c85"
 uuid = "a3b82374-2e81-5b9e-98ce-41277c0e4c87"
-version = "0.4.1"
+version = "0.5.0"
 
 [[MbedTLS]]
 deps = ["Dates", "MbedTLS_jll", "Random", "Sockets"]
@@ -371,9 +371,9 @@ uuid = "d8a4904e-b15c-11e9-3269-09a3773c0cb0"
 version = "0.2.10"
 
 [[NaNMath]]
-git-tree-sha1 = "928b8ca9b2791081dc71a51c55347c27c618760f"
+git-tree-sha1 = "c84c576296d0e2fbb3fc134d3e09086b3ea617cd"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
-version = "0.3.3"
+version = "0.3.4"
 
 [[OpenBLAS32_jll]]
 deps = ["CompilerSupportLibraries_jll", "Libdl", "Pkg"]
@@ -489,10 +489,10 @@ deps = ["Distributed", "InteractiveUtils", "Logging", "Random"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [[TimeZones]]
-deps = ["Dates", "EzXML", "Mocking", "Printf", "RecipesBase", "Serialization", "Unicode"]
-git-tree-sha1 = "db7bc2051d4c2e5f336409224df81485c00de6cb"
+deps = ["Dates", "EzXML", "Mocking", "Pkg", "Printf", "RecipesBase", "Serialization", "Unicode"]
+git-tree-sha1 = "1038a97206e7696ba106f2c2dafa2e9cca393269"
 uuid = "f269a46b-ccf7-5d73-abea-4c690281aa53"
-version = "1.2.0"
+version = "1.3.1"
 
 [[ToeplitzMatrices]]
 deps = ["AbstractFFTs", "FFTW", "LinearAlgebra", "StatsBase"]

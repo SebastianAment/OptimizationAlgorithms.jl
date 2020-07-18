@@ -9,6 +9,8 @@ using LinearAlgebraExtensions: difference, LazyDifference
 const euclidean = Metrics.EuclideanMetric()
 
 # TODO: primal and primal-dual barrier methods
+# could do: primal-dual method for x > 0
+
 # TODO: update_value!: updates input and returns value of updated input
 # TODO: pretty-print of statistics of optimization run (number of steps, objective function history, etc.)
 # TODO: all directions are time-indpendent, except ADAM if interpreted as direction

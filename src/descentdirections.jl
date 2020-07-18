@@ -280,9 +280,9 @@ objective(D::UnitDirection) = objective(D.direction)
 value(D::UnitDirection, x::AbstractArray) = value(D.direction, x)
 function value_direction(D::UnitDirection, x::AbstractArray)
    v, d = value_direction(D.direction, x)
-   n = norm(d)
-   if n > 0
-       d ./= n
+   dirnorm = norm(d)
+   if dirnorm > 0
+       d ./= dirnorm
    end
    v, d
 end
@@ -298,9 +298,9 @@ objective(D::TrustedDirection) = objective(D.direction)
 value(D::TrustedDirection, x::AbstractArray) = value(D.direction, x)
 function value_direction(D::TrustedDirection, x::AbstractArray)
    v, d = value_direction(D.direction, x)
-   n = norm(d)
-   if n > D.maxdirnorm
-       d ./= n
+   dirnorm = norm(d)
+   if dirnorm > D.maxdirnorm
+       d .*= D.maxdirnorm / dirnorm
    end
    v, d
 end
