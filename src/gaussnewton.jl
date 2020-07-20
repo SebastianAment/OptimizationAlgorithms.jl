@@ -130,6 +130,7 @@ function optimize!(LM::LevenbergMarquart{<:Real},
 				break
 			end
 		end
+		verbose isa Val{false} || lm_verbose(i, newval, val, λ)
 		if newval < min_val || (abs(newval-val) < min_decrease && i ≥ min_iter) # if convergence criteria are met,
 			if λ > min_lambda # make sure that we at least take one GaussNewton step at the optimum for maximum accuracy
 				λ = min_lambda
@@ -137,7 +138,6 @@ function optimize!(LM::LevenbergMarquart{<:Real},
 				break
 			end
 		end
-		verbose isa Val{false} || lm_verbose(i, newval, val, λ)
 		val = newval
         copy!(oldx, x)
 	end
