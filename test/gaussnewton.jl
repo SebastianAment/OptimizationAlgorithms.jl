@@ -2,7 +2,7 @@ module TestGaussNewton
 
 using Test
 using Optimization
-using Optimization: GaussNewton, LevenbergMarquart, DecreasingStep
+using Optimization: GaussNewton, LevenbergMarquart, DecreasingStep, LevenbergMarquartSettings
 using Optimization: update!, optimize!
 
 function test_problem(n)
@@ -45,8 +45,8 @@ end
     tol = 1e-8
     # tesing out intitialization with very large lambda, min_decrease, and min_iter
     res = copy(y)
-    optimize!(LM, ab, res, lambda = 1e12, min_decrease = 1e-10,
-                            min_iter = 16, min_val = 1e-12)
+    stn = LevenbergMarquartSettings(max_iter = 16, min_decrease = 1e-10, min_resnorm = 1e-10, min_res = 0)
+    optimize!(LM, ab, res, stn) #, 1e-6, Val(true))
     @test isapprox(ab, ab0, atol = tol)
 end
 

@@ -1,18 +1,17 @@
 abstract type AbstractGaussNewton{T} <: Direction{T} end
 
 function objective!(GN::AbstractGaussNewton, y::AbstractVector, x::AbstractVector)
-	sum(abs2, GN.f(y, x))
+	norm(GN.f(y, x))
 end
 # WARNING overwrites value vector
 function objective!(GN::AbstractGaussNewton, x::AbstractVector)
 	y = DiffResults.value(GN.r)
-    sum(abs2, GN.f(y, x))
+    norm(GN.f(y, x))
 end
 function objective(GN::AbstractGaussNewton, x::AbstractVector)
 	y = similar(DiffResults.value(GN.r))
-	sum(abs2, GN.f(y, x))
+	norm(GN.f(y, x))
 end
-
 function get_value_jacobian(GN::AbstractGaussNewton)
     return DiffResults.value(GN.r), DiffResults.jacobian(GN.r)
 end
@@ -33,7 +32,7 @@ function update_direction!(GN::AbstractGaussNewton, λ::Real, min_diagonal::Real
     C = cholesky!(GN.JJ) # constant allocation
     ldiv!(C, GN.d)
     GN.d .*= -1
-    return sum(abs2, y), GN.d
+    return norm(y), GN.d
 end
 
 function lm_scaling!(JJ::AbstractMatrix, λ::Real, min_diagonal::Real = 1e-12)
@@ -68,7 +67,7 @@ function valdir(GN::GaussNewton, x::AbstractVector, qr::Val{true})
     y, J = update_jacobian!(GN, x)
     ldiv!(GN.d, qr!(J), y)
     GN.d .*= -1
-    return sum(abs2, y), GN.d
+    return norm(y), GN.d
 end
 
 function valdir(GN::GaussNewton, x::AbstractVector, min_diagonal::Real = 1e-12)
@@ -100,43 +99,57 @@ function valdir(LM::LevenbergMarquart, x::AbstractVector, λ::Real, min_diagonal
     update_direction!(LM, λ, min_diagonal)
 end
 
-# TODO: put settings in struct?
-# min_decrease is a minimum decrease in the residual norm below which the
-# algorithm terminates if also min_iter iterations have been executed
+################################################################################
+# settings for LM optimization algorithm
+struct LevenbergMarquartSettings{T<:Real}
+	max_iter::Int # maximum number of iterations
+	min_iter::Int # see min_decrease below
+	max_backtrack::Int # maximum number of consecutive backtracks (λ increases)
+
+	min_resnorm::T # minimum norm of residual vector for termination
+	min_res::T # elementwise minimum of residual vector for termination
+
+	min_decrease::T # minimum decrease in residual norm for termination
+	 # ... after at least miniter iterations have been executed
+
+	max_step::T # maximum norm of step proposal
+	min_diagonal::T # minimum diagonal entries of Hessian approximation
+
+	min_λ::T
+	max_λ::T
+
+	increase_factor::T # factor by which λ is increased
+	decrease_factor::T
+end
+
+function LevenbergMarquartSettings(;max_iter::Int = 128, max_backtrack::Int = 32,
+	min_resnorm::Real = 1e-6, min_res::Real = 1e-6,
+	min_decrease::Real = 1e-12, min_iter::Int = 1,
+	max_step::Real = Inf, min_diagonal::Real = 1e-12,
+	min_lambda::Real = 1e-12, max_lambda::Real = 1e12,
+	increase_factor::Real = 10, decrease_factor::Real = 7)
+
+	LevenbergMarquartSettings(max_iter, min_iter, max_backtrack,
+								promote(min_resnorm, min_res,
+								min_decrease, max_step, min_diagonal,
+								min_lambda, max_lambda,
+								increase_factor, decrease_factor)...)
+end
+
+################################################################################
+
 function optimize!(LM::LevenbergMarquart{<:Real},
 			x::AbstractVector, y::AbstractVector,
-			verbose::Union{Val{true}, Val{false}} = Val(false);
-			maxiter::Int = 128, maxbacktrack::Int = 32,
-            min_val::Real = 1e-6, min_decrease::Real = 1e-12, min_iter::Int = 1,
-            max_step::Real = Inf, min_diagonal::Real = 1e-12,
-			lambda::Real = 1e-3, min_lambda::Real = 1e-12, max_lambda::Real = 1e12,
-            increase_factor::Real = 3, decrease_factor::Real = 2)
+			stn::LevenbergMarquartSettings = LevenbergMarquartSettings(),
+			λ::Real = 1e-6, verbose::Union{Val{true}, Val{false}} = Val(false))
     oldx = copy(x)
-	λ = lambda
-	val, newval = Inf, Inf
-    for i in 1:maxiter
+	val, newval = objective!(LM, y, x), Inf
+    for i in 1:stn.max_iter
 		update_jacobian!(LM, oldx)
-		for j in 1:maxbacktrack
-			val, dx = update_direction!(LM, λ, min_diagonal)
-			@. x = oldx + dx
-			newval = sum(abs2, LM.f(y, x))
-			if newval > val || isnan(newval) || any(x->abs(x) > max_step, dx)
-				λ = min(λ * increase_factor, max_lambda)
-				if !(j < maxbacktrack)
-					return x .= oldx # copy!(x, oldx) # if backtracking wasn't successful
-				end
-			else
-				λ = max(λ / decrease_factor, min_lambda)
-				break
-			end
-		end
-		verbose isa Val{false} || lm_verbose(i, newval, val, λ)
-		if newval < min_val || (abs(newval-val) < min_decrease && i ≥ min_iter) # if convergence criteria are met,
-			if λ > min_lambda # make sure that we at least take one GaussNewton step at the optimum for maximum accuracy
-				λ = min_lambda
-			else
-				break
-			end
+		newval, λ = lm_backtrack!(LM, x, oldx, y, λ, stn)
+		verbose isa Val{false} || lm_verbose(i, newval, val, λ, y)
+		if converged(stn, newval, val, y, i)
+			break
 		end
 		val = newval
         copy!(oldx, x)
@@ -144,9 +157,36 @@ function optimize!(LM::LevenbergMarquart{<:Real},
 	return x
 end
 
-function lm_verbose(i, newval, val, λ)
+function lm_backtrack!(LM::LevenbergMarquart,
+				x::AbstractVector, oldx::AbstractVector, y::AbstractVector,
+	 								λ::Real, stn::LevenbergMarquartSettings)
+	val = 0.
+	for j in 1:stn.max_backtrack
+		val, dx = update_direction!(LM, λ, stn.min_diagonal)
+		@. x = oldx + dx
+		newval = objective!(LM, y, x) # norm(LM.f(y, x))
+		if !(newval ≥ val || isnan(newval) || any(x->abs(x) > stn.max_step, dx))
+			λ = max(λ / stn.decrease_factor, stn.min_λ)
+			return newval, λ
+		end
+		λ = min(λ * stn.increase_factor, stn.max_λ)
+	end
+	copy!(x, oldx) # if backtracking wasn't successful
+	return val, λ
+end
+
+function converged(stn::LevenbergMarquartSettings, newval::Real, val::Real,
+						y::AbstractVector, i::Int)
+	newval ≤ stn.min_resnorm && return true
+	(abs(newval-val) < stn.min_decrease && i ≥ stn.min_iter) && return true
+	all(x -> abs(x) < stn.min_res, y) && return true
+	return false
+end
+
+function lm_verbose(i::Int, newval::Real, val::Real, λ::Real, y::AbstractVector)
 	println("iteration $i:
-		residual norm = $newval,
+		residual norm = $(norm(y)),
+		maximum residual = $(maximum(y)),
 		λ = $λ,
 		improvement = $(val-newval)")
 end
