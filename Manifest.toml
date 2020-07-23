@@ -210,9 +210,9 @@ uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 
 [[Intervals]]
 deps = ["Dates", "Printf", "RecipesBase", "Serialization", "TimeZones"]
-git-tree-sha1 = "8ffd41e6ddb0b569744aac36f8f5a4c92d28fc9e"
+git-tree-sha1 = "f8fd8065b6bccfbc2f9e7dd1fa5c0dde81d09185"
 uuid = "d8418881-c3e1-53bb-8760-2df7ec849ed5"
-version = "1.4.0"
+version = "1.4.1"
 
 [[IterTools]]
 git-tree-sha1 = "05110a2ab1fc5f932622ffea2a003221f4782c18"
@@ -261,7 +261,7 @@ version = "0.16.15"
 
 [[LazyInverse]]
 deps = ["LinearAlgebra", "Test"]
-git-tree-sha1 = "7cab86851a227558a930bfc3773544716221e402"
+git-tree-sha1 = "956270f7d4e3cb993c92a03119927f5ba9265ff3"
 repo-rev = "master"
 repo-url = "https://github.com/SebastianAment/LazyInverse.jl.git"
 uuid = "d0afe1cb-6484-4949-b9e9-61bc645ed6c7"
@@ -286,7 +286,7 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[LinearAlgebraExtensions]]
 deps = ["FFTW", "InfiniteArrays", "LazyArrays", "LazyInverse", "LinearAlgebra", "StatsBase", "Test"]
-git-tree-sha1 = "4145a01c98fc4435dda690291390492809d0ee1d"
+git-tree-sha1 = "8900bdfb018d629b4642ed4eaa8bf7c4861770e9"
 repo-rev = "master"
 repo-url = "https://github.com/SebastianAment/LinearAlgebraExtensions.jl.git"
 uuid = "cb114d4a-f1bd-499c-ad9e-7f2ed74575b9"
@@ -427,9 +427,9 @@ deps = ["Serialization"]
 uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [[RecipesBase]]
-git-tree-sha1 = "54f8ceb165a0f6d083f0d12cb4996f5367c6edbc"
+git-tree-sha1 = "58de8f7e33b7fda6ee39eff65169cd1e19d0c107"
 uuid = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
-version = "1.0.1"
+version = "1.0.2"
 
 [[Reexport]]
 deps = ["Pkg"]
@@ -515,7 +515,7 @@ uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 
 [[WoodburyIdentity]]
 deps = ["BenchmarkTools", "LazyInverse", "LinearAlgebra", "LinearAlgebraExtensions", "Test"]
-git-tree-sha1 = "3ded1ba7c888ba76273abcaf907df638a1637946"
+git-tree-sha1 = "bd0bed9909a12a33d3ec0c78cb6dfb849f723cbb"
 repo-rev = "master"
 repo-url = "git@github.com:SebastianAment/WoodburyIdentity.jl.git"
 uuid = "49563772-d9e4-48b4-a8b6-4cbe661ead9f"

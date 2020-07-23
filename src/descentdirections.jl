@@ -291,16 +291,21 @@ end
 # can prevent optimization from shooting off
 struct TrustedDirection{T, D<:Direction{T}, S} <: Direction{T}
    direction::D
-   maxdirnorm::S
+   maxnorm::S
+   maxentry::S
+   function TrustedDirection(d::Direction{T}, maxnorm::Real = 1., maxentry::Real = Inf) where {T}
+       maxnorm, maxentry = promote(maxnorm, maxentry)
+       new{T, typeof(d), typeof(maxnorm)}(d, maxnorm, maxentry)
+   end
 end
-TrustedDirection(d::Direction) = TrustedDirection(d, 1.)
 objective(D::TrustedDirection) = objective(D.direction)
 value(D::TrustedDirection, x::AbstractArray) = value(D.direction, x)
 function value_direction(D::TrustedDirection, x::AbstractArray)
    v, d = value_direction(D.direction, x)
    dirnorm = norm(d)
-   if dirnorm > D.maxdirnorm
-       d .*= D.maxdirnorm / dirnorm
+   maxentry = maximum(abs, d)
+   if dirnorm > D.maxnorm || maxentry > D.maxentry
+       @. d *= min(D.maxnorm / dirnorm, D.maxentry / maxentry)
    end
    v, d
 end

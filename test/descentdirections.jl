@@ -166,14 +166,23 @@ end
     fixedpoint!(B, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
 
+    x = 1e2(randn(n) .+ 1)
+    @test norm(B(x)) > 1 # normal direction is large
+
     U = Optimization.UnitDirection(B)
     @test U(x) isa AbstractVector
     @test norm(U(x)) ≈ 1
     @test dot(U(x), B(x)) ≈ norm(B(x)) # co-linear with original direction
 
-    TD = Optimization.TrustedDirection(B)
-    @test TD(x) isa AbstractVector
-    @test norm(TD(x)) ≤ 1
+    TD1 = Optimization.TrustedDirection(B, 1., Inf) # testing norm threshold
+    TD2 = Optimization.TrustedDirection(B, Inf, 1.) # testing elementwise threshold
+    @test TD1(x) isa AbstractVector
+    @test norm(TD1(x)) ≈ 1
+    @test norm(TD2(x)) > 1 && maximum(abs, TD2(x)) ≈ 1
+
+    @. x = μ + 1e-6*randn()
+    @test norm(TD1(x)) ≈ norm(B(x)) # no change if gradient is sufficiently small
+    @test norm(TD2(x)) ≈ norm(B(x)) # no change if gradient is sufficiently small
 end
 
 end # TestDescentDirections
