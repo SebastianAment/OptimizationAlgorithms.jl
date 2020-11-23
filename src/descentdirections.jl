@@ -203,10 +203,11 @@ struct LBFGS{T, D, X<:AbstractVector{T}, V, A, S} <: Direction{T}
     check::Bool
 end
 
-function LBFGS(dir::D, x::X, m::Int, scaling! = lbfgs_scaling!;
-                check::Bool = true) where {T, D<:Direction, X<:AbstractVector{T}}
+function LBFGS(dir::Direction, x::AbstractVector, m::Int,
+                    scaling! = lbfgs_scaling!; check::Bool = true)
     m ≥ 1 || error("recursion depth m cannot be smaller than 1")
-    s = CircularBuffer{X}(m) # TODO: elements could be static arrays
+    X = typeof(x)
+    s = CircularBuffer{X}(m) # IDEA: elements could be static arrays
     y = CircularBuffer{X}(m)
     V = typeof(s)
     for i in 1:m
@@ -219,10 +220,10 @@ function LBFGS(dir::D, x::X, m::Int, scaling! = lbfgs_scaling!;
     LBFGS(dir, copy(x), ∇, d, s, y, m, α, scaling!, check)
 end
 
-function LBFGS(f::Function, x, m::Int, scaling! = lbfgs_scaling!; check = true)
+function LBFGS(f, x::AbstractVector, m::Int, scaling! = lbfgs_scaling!; check = true)
     LBFGS(Gradient(f, x), x, m, scaling!, check = check)
 end
-function LBFGS(f::Function, ∇::Function, x, m::Int, scaling! = lbfgs_scaling!; check = true)
+function LBFGS(f, ∇, x::AbstractVector, m::Int, scaling! = lbfgs_scaling!; check = true)
     LBFGS(CustomDirection(f, x->(f(x), -∇(x)), x), x, m, scaling!, check = check)
 end
 objective(L::LBFGS) = objective(L.direction)

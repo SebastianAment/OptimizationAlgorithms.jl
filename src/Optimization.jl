@@ -1,36 +1,15 @@
 module Optimization
 
 using LinearAlgebra
-using Metrics
 using LinearAlgebraExtensions
 using LinearAlgebraExtensions: difference, LazyDifference
-
-# define euclidean metric
-const euclidean = Metrics.EuclideanMetric()
-
-# TODO: primal and primal-dual barrier methods
-# could do: primal-dual method for x > 0
-
-# TODO: update_value!: updates input and returns value of updated input
-# TODO: pretty-print of statistics of optimization run (number of steps, objective function history, etc.)
-# TODO: all directions are time-indpendent, except ADAM if interpreted as direction
-# could be remedied, if we add an ADAM stepsize, which is time-dependent
-# cg is also behaves differently for first iteration
-# TODO: projections
-# TODO: Frank-Wolfe algorithm for linearly constrained convex problems
-# TODO: Lagrange multiplier methods
-# TODO: partitioned quasi-newton methods for constrained optimization (Coleman)
-# TODO: Proximal methods, proximal operators, e.g. for l1 regularized minimization
 
 # principle of this package:
 # reduce optimization problems to fixed point iterations
 # to this end, design fixed point operator f! and stopping rule isfixed
 
-# somthing to consider:
-# "Runge–Kutta-like scaling techniques for first-order methods in convex optimization"
-
 ######################## General Fixed Point Algorithm #########################
-# TODO: allocating (for immutable types), via 0D array?
+# IDEA: allocating (for immutable types), via 0D array?
 # attempts to find a fixed point of f! by iterating f! on x
 # in light of ode's, this could be a gradient flow
 # general enough: iterate! - ?
@@ -83,7 +62,7 @@ end
 (T::StoppingCriterion)(y::Real, t::Integer) = T(y) || T(t)
 function (T::StoppingCriterion)(x::AbstractVector)
     any(isnan, x) && error("x contains NaN: x = $x")
-    dx = euclidean(x, T.x)
+    dx = norm(difference(x, T.x))
     rx = dx / norm(x)
     isfixed = dx < T.dx
     isfixed |= rx < T.rx
@@ -151,33 +130,3 @@ include("stepsize.jl")
 include("submodular.jl")
 
 end # Optimization
-
-# TODO: replace fixedpoint! with optimize!:
-# function optimize!(f!::Update, x, isfixed, maxiter::Int = 128)
-#     t = 1
-#     for i in 1:maxiter
-#         y = f!(x, t)
-#         t += 1
-#         if !isfixed(x, y, t)
-#             break
-#         end
-#     end
-#     x, t
-# end
-
-################################################################################
-# to make a descent direction out of a ascent direction
-# struct Descent{T, D} <: Direction{T}
-#     d::D
-# end
-# direction!(D::Descent, x::AbstractVector) = -direction!(D.d, x)
-#
-# function update!(D::Descent, x::AbstractVector)
-#     x .-= direction!(D.d, x)
-# end
-
-######################### Convenience functions ################################
-# intervalProjection(x, a, b) = max(min(x, b), a)
-# intervalProjection!(y, x, a, b) = (@. y = max(min(x, b), a))
-# # exponential average convenience
-# expave!(z, α, x, y) = (@. z = α * x + (1-α) * y)

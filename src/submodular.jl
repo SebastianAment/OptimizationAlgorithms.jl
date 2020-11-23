@@ -1,18 +1,23 @@
 ########################### Submodular Minimization ############################
-# greedy algorithm for submodular minimization
+# greedy algorithm for submodular minimization, or maximization??
+# WARNING: before using, check min / max
 struct Submodular{T, F, X, D} <: Update{T}
     f::F # set-valued input function
     x::X # set to choose from
     δ::D # bound on improvement of adding a certain element
-    n::Int # maximum set cardinality
-    function Submodular(f, x::AbstractVector, n::Int)
-        δ = fill(-Inf, length(x))
-        new{eltype(x), typeof(f), typeof(x), typeof(δ)}(f, x, δ, n)
-    end
+    # function Submodular(f, x::Union{AbstractVector, AbstractSet})
+    #     δ = fill(-Inf, length(x))
+    #     new{eltype(x), typeof(f), typeof(x), typeof(δ)}(f, x, δ)
+    # end
 end
+function Submodular(f, x::Union{AbstractVector, AbstractSet}, n::Int)
+    δ = fill(-Inf, length(x))
+    Submodular(f, x, δ)
+end
+
 # TODO: parallelization, especially for first pass
 function update!(S::Submodular, x::Union{AbstractVector, AbstractSet})
-    length(x) ≥ S.n ? (return x) : nothing # only add if we haven't hit maximum cardinality
+    # length(x) ≥ S.n ? (return x) : nothing # only add if we haven't hit maximum cardinality
     f, δ, grid = S.f, S.δ, S.x
     ind = sortperm(δ) # sort grid according to increasing δ (decreasing in magnitude)
     permute!(δ, ind)
