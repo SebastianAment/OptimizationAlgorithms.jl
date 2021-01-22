@@ -2,7 +2,7 @@ module TestLinearSolvers
 
 using Test
 using LinearAlgebra
-using Optimization: cg, CG, CGMatrix
+using OptimizationAlgorithms: cg, CG, CGMatrix
 
 @testset "conjugate gradient" begin
     n = 16

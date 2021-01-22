@@ -2,8 +2,8 @@ module TestDescentDirections
 
 using LinearAlgebra
 using Test
-using Optimization
-using Optimization: fixedpoint!, StoppingCriterion, update!
+using OptimizationAlgorithms
+using OptimizationAlgorithms: fixedpoint!, StoppingCriterion, update!
 using ForwardDiff: derivative, gradient, hessian
 
 # TODO: separate test problems from algorithms
@@ -15,7 +15,7 @@ using ForwardDiff: derivative, gradient, hessian
     μ = randn(n)
     f(x) = (x-μ)'A*(x-μ)
     x = randn(n)
-    G = Optimization.ScaledGradient(f, x)
+    G = OptimizationAlgorithms.ScaledGradient(f, x)
     ε = 1e-6
     x, t = fixedpoint!(G, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
@@ -25,14 +25,14 @@ end
     # one step convergence for quadratics
     f(x) = x^2
     x = randn()
-    N = Optimization.Newton(f, x)
+    N = OptimizationAlgorithms.Newton(f, x)
     x += N(x)
     @test derivative(f, x) ≈ 0
 
     # non-quadratic problem
     f(x) = x^2 + sin(x)
     x = 1.
-    N = Optimization.Newton(f, x)
+    N = OptimizationAlgorithms.Newton(f, x)
     for i in 1:8
         x += N(x)
     end
@@ -47,13 +47,13 @@ end
     ε = 1e-12
 
     x = randn(n)
-    N = Optimization.Newton(f, x)
+    N = OptimizationAlgorithms.Newton(f, x)
     x += N(x)
     @test norm(gradient(f, x)) < ε
 
     # saddle-free Newton
     x = randn(n)
-    SFN = Optimization.SaddleFreeNewton(f, x)
+    SFN = OptimizationAlgorithms.SaddleFreeNewton(f, x)
     x += SFN(x)
     @test norm(gradient(f, x)) < ε
 
@@ -61,20 +61,20 @@ end
     f(x) = 1/2*(x-μ)'A*(x-μ) - sum(x->log(abs2(x)), x)
 
     x = 2randn(n)
-    N = Optimization.Newton(f, x)
+    N = OptimizationAlgorithms.Newton(f, x)
     ε = 1e-6
     fixedpoint!(N, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
 
     x = 2randn(n)
-    SFN = Optimization.SaddleFreeNewton(f, x)
+    SFN = OptimizationAlgorithms.SaddleFreeNewton(f, x)
     fixedpoint!(SFN, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
 
     # test non-convex iteration
     f(x) = sum(cos, x)
     x = 1e-6randn(n)
-    SFN = Optimization.SaddleFreeNewton(f, x)
+    SFN = OptimizationAlgorithms.SaddleFreeNewton(f, x)
     fixedpoint!(SFN, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
     @test isposdef(hessian(f, x)) # not a saddle point or local maximum
@@ -90,7 +90,7 @@ end
     f(x) = (x-μ)'A*(x-μ)
 
     x = randn(n)
-    B = Optimization.BFGS(f, x)
+    B = OptimizationAlgorithms.BFGS(f, x)
     ε = 1e-6
     x, t = fixedpoint!(B, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
@@ -99,11 +99,11 @@ end
     x = randn(n)
     α = [1e3, 1., 1e-3]
     g(x) = f(α.*x)
-    B = Optimization.BFGS(g, x)
+    B = OptimizationAlgorithms.BFGS(g, x)
     x, t = fixedpoint!(B, x, StoppingCriterion(x, dx = 1e-3ε, maxiter = 256))
     # test BFGS where inverse Hessian is initialized to Diagonal(1.0./α.^2)
     xs = randn(n)
-    BS = Optimization.BFGS(g, xs, Matrix(Diagonal(1.0./α.^2)))
+    BS = OptimizationAlgorithms.BFGS(g, xs, Matrix(Diagonal(1.0./α.^2)))
     xs, ts = fixedpoint!(BS, xs, StoppingCriterion(x, dx = 1e-3ε, maxiter = 256))
     @test norm(gradient(g, x)) < ε
     @test norm(gradient(g, xs)) < ε
@@ -111,22 +111,22 @@ end
     # @test ts < t # scaling outperforms non-scaling for ill-conditioned problem
     # # WARNING: This test could fail, but most times doesn't
 
-    # optimization of 1D non-convex objective (has to forgo BFGS update)
+    # OptimizationAlgorithms of 1D non-convex objective (has to forgo BFGS update)
     x = [2.] # fill(2., 2)
     h(x) = 1-exp(-sum(abs2, x))
-    B = Optimization.BFGS(h, x, check = false)
+    B = OptimizationAlgorithms.BFGS(h, x, check = false)
     x, t = fixedpoint!(B, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(h, x)) < ε
 
     x = [2.] # fill(2., 2)
-    B = Optimization.LBFGS(h, x, 3, check = false)
+    B = OptimizationAlgorithms.LBFGS(h, x, 3, check = false)
     x, t = fixedpoint!(B, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(h, x)) < ε
 
     ###################### limited-memory BFGS ##################################
     m = 3
     x = randn(n)
-    B = Optimization.LBFGS(f, x, m)
+    B = OptimizationAlgorithms.LBFGS(f, x, m)
     ε = 1e-6
     x, t = fixedpoint!(B, x, StoppingCriterion(x, dx = 1e-2ε))
     # println(t)
@@ -135,13 +135,13 @@ end
     # higher-dimensional non-quadratic
     f(x) = 1/2*(x-μ)'A*(x-μ) - sum(x->log(abs2(x)), x)
     x = randn(n)
-    B = Optimization.BFGS(f, x)
+    B = OptimizationAlgorithms.BFGS(f, x)
     ε = 1e-6
     x, t = fixedpoint!(B, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
 
     x = randn(n)
-    B = Optimization.LBFGS(f, x, m)
+    B = OptimizationAlgorithms.LBFGS(f, x, m)
     ε = 1e-6
     x, t = fixedpoint!(B, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
@@ -161,7 +161,7 @@ end
         v, g
     end
     x = 100randn(n) + μ # normally distributed around μ
-    B = Optimization.CustomDirection(f, valdir, x)
+    B = OptimizationAlgorithms.CustomDirection(f, valdir, x)
     ε = 1e-6
     fixedpoint!(B, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
@@ -169,13 +169,13 @@ end
     x = 1e2(randn(n) .+ 1)
     @test norm(B(x)) > 1 # normal direction is large
 
-    U = Optimization.UnitDirection(B)
+    U = OptimizationAlgorithms.UnitDirection(B)
     @test U(x) isa AbstractVector
     @test norm(U(x)) ≈ 1
     @test dot(U(x), B(x)) ≈ norm(B(x)) # co-linear with original direction
 
-    TD1 = Optimization.TrustedDirection(B, 1., Inf) # testing norm threshold
-    TD2 = Optimization.TrustedDirection(B, Inf, 1.) # testing elementwise threshold
+    TD1 = OptimizationAlgorithms.TrustedDirection(B, 1., Inf) # testing norm threshold
+    TD2 = OptimizationAlgorithms.TrustedDirection(B, Inf, 1.) # testing elementwise threshold
     @test TD1(x) isa AbstractVector
     @test norm(TD1(x)) ≈ 1
     @test norm(TD2(x)) > 1 && maximum(abs, TD2(x)) ≈ 1

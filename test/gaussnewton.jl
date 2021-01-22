@@ -1,9 +1,9 @@
 module TestGaussNewton
 
 using Test
-using Optimization
-using Optimization: GaussNewton, LevenbergMarquart, DecreasingStep, LevenbergMarquartSettings
-using Optimization: update!, optimize!
+using OptimizationAlgorithms
+using OptimizationAlgorithms: GaussNewton, LevenbergMarquart, DecreasingStep, LevenbergMarquartSettings
+using OptimizationAlgorithms: update!, optimize!
 
 function test_problem(n)
     x = sort!(randn(n))

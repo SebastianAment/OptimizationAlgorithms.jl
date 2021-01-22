@@ -1,6 +1,6 @@
 module TestUtil
 using Test
-using Optimization: CircularBuffer
+using OptimizationAlgorithms: CircularBuffer
 
 @testset "CircularBuffer" begin
     cb = CircularBuffer{Float64}(2)

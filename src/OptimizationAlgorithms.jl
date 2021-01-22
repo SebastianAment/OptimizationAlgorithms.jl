@@ -1,4 +1,4 @@
-module Optimization
+module OptimizationAlgorithms
 
 using LinearAlgebra
 using LinearAlgebraExtensions

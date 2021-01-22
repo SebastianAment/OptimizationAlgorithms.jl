@@ -1,9 +1,9 @@
 module TestDescentUpdates
 using Test
 using LinearAlgebra
-using Optimization
-using Optimization: Gradient, ScaledGradient, StoppingCriterion, fixedpoint!
-using Optimization: PolyakMomentum, Nesterov, ADAM, AMSGRAD
+using OptimizationAlgorithms
+using OptimizationAlgorithms: Gradient, ScaledGradient, StoppingCriterion, fixedpoint!
+using OptimizationAlgorithms: PolyakMomentum, Nesterov, ADAM, AMSGRAD
 using ForwardDiff: gradient
 
 @testset "PolyakMomentum" begin

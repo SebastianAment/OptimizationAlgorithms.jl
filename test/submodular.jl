@@ -1,8 +1,8 @@
 module TestSubmodular
 using Test
-using Optimization
+using OptimizationAlgorithms
 
 @testset "submodular" begin
-    @test true 
+    @test true
 end
 end # TestSubmodular
