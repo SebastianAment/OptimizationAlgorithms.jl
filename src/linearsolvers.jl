@@ -13,14 +13,14 @@ struct ConjugateGradient{T, M, V<:AbstractVector, R<:CircularBuffer} <: Update{T
     Ad::V # product of A and direction
     r::R # cirular buffer, containing last two residuals
     function ConjugateGradient(mul_A!, b::AbstractVector, x::AbstractVector)
-        r₁ = similar(b)
+        r₁ = zero(b)
         mul_A!(r₁, x)
         @. r₁ = b - r₁ # mul!(r₁, A, x, -1., 1.) # r = b - Ax
         d = copy(r₁)
         V = typeof(b)
         r = CircularBuffer{V}(2)
-        push!(r, r₁); push!(r, similar(b));
-        Ad = similar(b)
+        push!(r, r₁); push!(r, zero(b));
+        Ad = zero(b)
         new{eltype(x), typeof(mul_A!), V, typeof(r)}(mul_A!, b, d, Ad, r)
     end
 end
