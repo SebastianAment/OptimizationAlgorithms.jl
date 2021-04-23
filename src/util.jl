@@ -18,8 +18,9 @@ end
 
 # TODO: make negative shifts efficient
 # TODO: if shifts > c.length ÷ 2,
-# used in ConjugateGradient
-function Base.circshift!(cb::CircularBuffer, shifts::Int = 1)
+# used in LBFGS
+# Base.circshift
+function _circshift!(cb::CircularBuffer, shifts::Int = 1)
     shifts = mod(shifts, cb.length) # since identity if shifts = cb.length
     if shifts > 0
         if cb.length < cb.capacity

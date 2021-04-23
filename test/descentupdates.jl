@@ -11,7 +11,7 @@ using ForwardDiff: gradient
     A = randn(n, n)
     A = A'A + I
     μ = randn(n)
-    f(x) = (x-μ)'A*(x-μ)
+    f = x -> (x-μ)'A*(x-μ)
     x = randn(n)
     G = Gradient(f, x)
     α = .1
@@ -28,7 +28,7 @@ end
     A = randn(n, n)
     A = A'A + I
     μ = randn(n)
-    f(x) = (x-μ)'A*(x-μ)
+    f = x -> (x-μ)'A*(x-μ)
     x = randn(n)
     α = .1
     β = .5
@@ -44,7 +44,7 @@ end
     A = randn(n, n)
     A = A'A + I
     μ = randn(n)
-    f(x) = (x-μ)'A*(x-μ)
+    f = x -> (x-μ)'A*(x-μ)
     x = randn(n)
     G = Gradient(f, x)
     α = .1
@@ -52,7 +52,7 @@ end
     β₂ = 0.999 # this should be large
     G = ADAM(G, x, α, β₁, β₂)
     ε = 1e-6
-    fixedpoint!(G, x, StoppingCriterion(x, dx = 1e-2ε, maxiter = 256))
+    fixedpoint!(G, x, StoppingCriterion(x, dx = 1e-2ε, maxiter = 1024))
     @test norm(gradient(f, x)) < ε
 end
 
@@ -61,7 +61,7 @@ end
     A = randn(n, n)
     A = A'A + I
     μ = randn(n)
-    f(x) = (x-μ)'A*(x-μ)
+    f = x -> (x-μ)'A*(x-μ)
     x = randn(n)
     G = Gradient(f, x)
     α = .1
@@ -69,7 +69,7 @@ end
     β₂ = 0.999 # this should be large
     G = AMSGRAD(G, x, α, β₁, β₂)
     ε = 1e-6
-    fixedpoint!(G, x, StoppingCriterion(x, dx = 1e-2ε, maxiter = 256))
+    fixedpoint!(G, x, StoppingCriterion(x, dx = 1e-2ε, maxiter = 1024))
     @test norm(gradient(f, x)) < ε
 end
 

@@ -13,7 +13,7 @@ using ForwardDiff: derivative, gradient, hessian
     A = randn(n, n)
     A = A'A + I
     μ = randn(n)
-    f(x) = (x-μ)'A*(x-μ)
+    f = x -> (x-μ)'A*(x-μ)
     x = randn(n)
     G = OptimizationAlgorithms.ScaledGradient(f, x)
     ε = 1e-6
@@ -23,14 +23,14 @@ end
 
 @testset "Newton's method" begin
     # one step convergence for quadratics
-    f(x) = x^2
+    f = x -> x^2
     x = randn()
     N = OptimizationAlgorithms.Newton(f, x)
     x += N(x)
     @test derivative(f, x) ≈ 0
 
     # non-quadratic problem
-    f(x) = x^2 + sin(x)
+    f = x -> x^2 + sin(x)
     x = 1.
     N = OptimizationAlgorithms.Newton(f, x)
     for i in 1:8
@@ -43,7 +43,7 @@ end
     A = randn(n, n) + I
     A = A'A
     μ = randn(n)
-    f(x) = (x-μ)'A*(x-μ)
+    f = x -> (x-μ)'A*(x-μ)
     ε = 1e-12
 
     x = randn(n)
@@ -58,7 +58,7 @@ end
     @test norm(gradient(f, x)) < ε
 
     # higher-dimensional non-quadratic
-    f(x) = 1/2*(x-μ)'A*(x-μ) - sum(x->log(abs2(x)), x)
+    f = x -> 1/2*(x-μ)'A*(x-μ) - sum(x->log(abs2(x)), x)
 
     x = 2randn(n)
     N = OptimizationAlgorithms.Newton(f, x)
@@ -72,7 +72,7 @@ end
     @test norm(gradient(f, x)) < ε
 
     # test non-convex iteration
-    f(x) = sum(cos, x)
+    f = x -> sum(cos, x)
     x = 1e-6randn(n)
     SFN = OptimizationAlgorithms.SaddleFreeNewton(f, x)
     fixedpoint!(SFN, x, StoppingCriterion(x, dx = 1e-2ε))
@@ -87,7 +87,7 @@ end
     A = randn(n, n)
     A = A'A
     μ = randn(n)
-    f(x) = (x-μ)'A*(x-μ)
+    f = x -> (x-μ)'A*(x-μ)
 
     x = randn(n)
     B = OptimizationAlgorithms.BFGS(f, x)
@@ -98,7 +98,7 @@ end
     # BFGS with ill-conditioned problem
     x = randn(n)
     α = [1e3, 1., 1e-3]
-    g(x) = f(α.*x)
+    g = x -> f(α.*x)
     B = OptimizationAlgorithms.BFGS(g, x)
     x, t = fixedpoint!(B, x, StoppingCriterion(x, dx = 1e-3ε, maxiter = 256))
     # test BFGS where inverse Hessian is initialized to Diagonal(1.0./α.^2)
@@ -113,7 +113,7 @@ end
 
     # OptimizationAlgorithms of 1D non-convex objective (has to forgo BFGS update)
     x = [2.] # fill(2., 2)
-    h(x) = 1-exp(-sum(abs2, x))
+    h = x -> 1-exp(-sum(abs2, x))
     B = OptimizationAlgorithms.BFGS(h, x, check = false)
     x, t = fixedpoint!(B, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(h, x)) < ε
@@ -133,7 +133,7 @@ end
     @test norm(gradient(f, x)) < ε
 
     # higher-dimensional non-quadratic
-    f(x) = 1/2*(x-μ)'A*(x-μ) - sum(x->log(abs2(x)), x)
+    f = x -> 1/2*(x-μ)'A*(x-μ) - sum(x->log(abs2(x)), x)
     x = randn(n)
     B = OptimizationAlgorithms.BFGS(f, x)
     ε = 1e-6
@@ -153,7 +153,7 @@ end
     A = randn(n, n)
     A = 1/2*A'A + I
     μ = randn(n)
-    f(x) = (x-μ)'A*(x-μ)
+    f = x -> (x-μ)'A*(x-μ)
     function valdir(x::AbstractVector) # shows how evaluation and gradient computation can be pooled
         g = A*(x-μ)
         v = (x-μ)'g

@@ -53,7 +53,7 @@ mutable struct StoppingCriterion{T, S}
 
     maxiter::Int # maximum iterations
     function StoppingCriterion(x::AbstractVector, y::Real = Inf;
-                dx = 1e-6, rx = 0., dy = 1e-6, ry = 0., maxiter::Int = 128)
+                dx = 1e-6, rx = 0., dy = 1e-6, ry = 0., maxiter::Int = 1024)
         new{typeof(x), typeof(y)}(fill(Inf, size(x)), dx, rx, y, dy, ry, maxiter)
     end
 end
@@ -124,7 +124,6 @@ include("descentdirections.jl")
 include("gaussnewton.jl")
 include("descentupdates.jl")
 include("stochastic.jl")
-include("linearsolvers.jl")
 include("ode.jl")
 include("stepsize.jl")
 include("submodular.jl")
