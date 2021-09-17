@@ -1,11 +1,11 @@
 # TODO: quasi-exact line search via interpolation, GPs
-# TODO: g .*= -g'g / (g'A*g) # optimal stepsize for quadratic problems
+# IDEA: g .*= -g'g / (g'A*g) # optimal stepsize for quadratic problems
 
 ################################################################################
 # inputs: searchcondition function, i.e. Armijo, Wolfe
 # stepupdate is step size updating policy
-function linesearch!(xn::T, x::T, α::Real, direction::T, searchcondition,
-                    maxbacktrack::Int, decrease::Real = 3.) where {T}
+function linesearch!(xn::AbstractVector, x::AbstractVector, α::Real,
+                     direction::AbstractVector, searchcondition, maxbacktrack::Int, decrease::Real = 3.)
     for i in 1:maxbacktrack
         @. xn = x + α * direction # update
         if searchcondition(α, xn)
@@ -15,28 +15,48 @@ function linesearch!(xn::T, x::T, α::Real, direction::T, searchcondition,
     end
     return false
 end
-################################################################################
-struct DecreasingStep{T, D, A, S} <: Update{T}
+# linesearch for scalar parameters
+function linesearch(x::Real, α::Real, direction::Real, searchcondition,
+                    maxbacktrack::Int, decrease::Real = 3.)
+    for i in 1:maxbacktrack
+        xn = x + α * direction # update
+        if searchcondition(α, xn)
+            return xn
+        end
+        α /= decrease
+    end
+    return x
+end
+########################### linesearch types ###################################
+struct DecreasingStep{T, D, A<:Real, S<:Real} <: Update{T}
     direction::D # αξία και κατεύθυνση
     x::T # storage for value
-    α::A # last α, has to be 0D array, or armijo is mutable (went with mutable)
+    α::A # stepsize
     c::S # coefficient in decreasing rule
     decrease::S # μείωση factor
     # increase::S # αύξηση factor
     maxbacktrack::Int
-    function DecreasingStep(dir::D, x::T, α::S = 1., c = 1., decrease = 3., # increase = 2
-                            maxbacktrack::Int = 16) where {T, D<:Direction, S}
-        # makes sure that we use a copy of x
-        new{T, D, S, S}(dir, copy(x), α, S(c), S(decrease), maxbacktrack)
+    function DecreasingStep(direction::Direction, x, α::Real = 1., c::Real = 1.0,
+                            decrease::Real = 3.0, maxbacktrack::Int = 16) # increase::Real = 2,
+        T, D, A, S = typeof(x), typeof(direction), typeof(α), promote_type(typeof(c), typeof(decrease)) #, typeof(increase))
+        new{T, D, A, S}(direction, copy(x), α, c, decrease, maxbacktrack) # makes sure that we use a copy of x
     end
 end
 
 objective(D::DecreasingStep) = objective(D.direction)
-function update!(D::DecreasingStep, x)
+function update!(D::DecreasingStep, x::AbstractVector)
     val, dir = valdir(D.direction, x)
     descent = DescentCondition(objective(D), val, x, D.c)
     success = linesearch!(D.x, x, D.α, dir, descent, D.maxbacktrack, D.decrease)
     return success ? copyto!(x, D.x) : x
+end
+# update for scalar parameter
+function update!(D::DecreasingStep, x::Real)
+    val, dir = valdir(D.direction, x)
+    descent = DescentCondition(objective(D), val, x, D.c)
+    xn = linesearch(x, D.α, dir, descent, D.maxbacktrack, D.decrease)
+    success = xn != x
+    return success ? xn : x
 end
 
 # combines descent condition and local minimum w.r.t. step size α condition
@@ -48,21 +68,30 @@ mutable struct DescentCondition{T, F, X}
     c::T # descent factor
 end
 function DescentCondition(objective::Function, value, x, c::Real = 1.)
-    DescentCondition(objective, value, typeof(value)(Inf), similar(x), c)
+    DescentCondition(objective, value, typeof(value)(Inf), zero(x), c)
 end
 function (D::DescentCondition)(α, xn)
     decreasing = D.new_value ≤ D.c * D.value # was the last proposal decreasing
     new_value = D.f(xn)
     alpha_minimum = D.new_value ≤ new_value # was the last proposal a stationary point w.r.t. α?
     if decreasing && alpha_minimum
-        xn .= D.xn # assign last proposal to current one
-        true
+        if xn isa Real
+            xn = D.xn
+        else
+            xn .= D.xn # assign last proposal to current one
+        end
+        return true
     else
-        D.xn .= xn
+        if xn isa Real
+            D.xn = xn
+        else
+            D.xn .= xn
+        end
         D.new_value = new_value
-        false
+        return false
     end
 end
+
 # weakest rule, no good theoretical guarantees, but works in practice and is fast
 function descent_condition(objective::Function, value, c::Real = 1.)
     return descent(α, xn) = (objective(xn) ≤ c * value)

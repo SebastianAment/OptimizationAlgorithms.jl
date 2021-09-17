@@ -3,7 +3,7 @@ module TestDescentDirections
 using LinearAlgebra
 using Test
 using OptimizationAlgorithms
-using OptimizationAlgorithms: fixedpoint!, StoppingCriterion, update!
+using OptimizationAlgorithms: fixedpoint!, StoppingCriterion, update!, optimize!
 using ForwardDiff: derivative, gradient, hessian
 
 # TODO: separate test problems from algorithms
@@ -18,6 +18,7 @@ using ForwardDiff: derivative, gradient, hessian
     G = OptimizationAlgorithms.ScaledGradient(f, x)
     ε = 1e-6
     x, t = fixedpoint!(G, x, StoppingCriterion(x, dx = 1e-2ε))
+    # x, t = optimize!(G, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
 end
 

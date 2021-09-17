@@ -71,6 +71,7 @@ function update!(A::ADAM, x::AbstractArray, t::Int)
     @. A.v = expave(A.v, dx^2, A.β₂)
     α_t = stepsize(A, t)
     @. x += α_t * A.m / (√A.v + A.ε)
+    x
 end
 
 # exponential average
@@ -105,5 +106,6 @@ end
 
 # stepsize to debias moments
 function stepsize(A::Union{ADAM, AMSGRAD}, t::Int)
+    t > 0 || throw(DomainError("time step has to be bigger than 0 but is equal to $t"))
     A.α * sqrt(1-A.β₂^t)/(1-A.β₁^t)
 end

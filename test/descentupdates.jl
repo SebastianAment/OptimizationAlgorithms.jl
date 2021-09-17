@@ -6,6 +6,7 @@ using OptimizationAlgorithms: Gradient, ScaledGradient, StoppingCriterion, fixed
 using OptimizationAlgorithms: PolyakMomentum, Nesterov, ADAM, AMSGRAD
 using ForwardDiff: gradient
 
+ε = 1e-4
 @testset "PolyakMomentum" begin
     n = 2
     A = randn(n, n)
@@ -17,7 +18,6 @@ using ForwardDiff: gradient
     α = .1
     β = .5
     G = PolyakMomentum(G, copy(x), α, β)
-    ε = 1e-6
     fixedpoint!(G, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
 end
@@ -30,11 +30,10 @@ end
     μ = randn(n)
     f = x -> (x-μ)'A*(x-μ)
     x = randn(n)
-    α = .1
+    α = 5e-2
     β = .5
     G = Gradient(f, x)
     G = Nesterov(G, x, α, β)
-    ε = 1e-6
     fixedpoint!(G, x, StoppingCriterion(x, dx = 1e-2ε))
     @test norm(gradient(f, x)) < ε
 end
@@ -51,7 +50,6 @@ end
     β₁ = 0.5
     β₂ = 0.999 # this should be large
     G = ADAM(G, x, α, β₁, β₂)
-    ε = 1e-6
     fixedpoint!(G, x, StoppingCriterion(x, dx = 1e-2ε, maxiter = 1024))
     @test norm(gradient(f, x)) < ε
 end
@@ -68,7 +66,6 @@ end
     β₁ = 0.5
     β₂ = 0.999 # this should be large
     G = AMSGRAD(G, x, α, β₁, β₂)
-    ε = 1e-6
     fixedpoint!(G, x, StoppingCriterion(x, dx = 1e-2ε, maxiter = 1024))
     @test norm(gradient(f, x)) < ε
 end

@@ -16,9 +16,10 @@ using LinearAlgebraExtensions: difference, LazyDifference
 # f! should be a fixed point operator, so ∃x s.t. x = f!(x)
 function fixedpoint!(f!, x, isfixed)
     t = 1
-    while !isfixed(x, t)
-        f!(x, t)
+    while true
+        x = f!(x, t)
         t += 1
+        isfixed(x, t) && break
     end
     x, t
 end
@@ -26,22 +27,24 @@ end
 # using default stopping criterion
 fixedpoint!(f!, x) = fixedpoint!(f!, x, StoppingCriterion(x))
 
-# TODO:
-# f!(x, t) should update x and return the value y
-function optimize!(f!, x, isfixed)
-    y = f!(x, t)
-    t = 1
-    while !isfixed(x, y, t)
-        y = f!(x, t)
-        t += 1
-    end
-    x, y, t
-end
-optimize!(f!, x) = optimize!(f!, x, StoppingCriterion(x))
+# # TODO:
+# # f!(x, t) should return both x and y for generality with scalar case
+# either rewrite update! to do this, thereby breaking it's use in fixedpoint!,
+# or write new function update_evaluate!()
+# function optimize!(f!, x, isfixed)
+#     t = 0
+#     while true
+#         x, y = f!(x, t)
+#         t += 1
+#         isfixed(x, y, t) && break
+#     end
+#     x, y, t
+# end
+# optimize!(f!, x) = optimize!(f!, x, StoppingCriterion(x))
 
 ########################### Stopping Criterion ##################################
-# TODO: add verbose option
-# TODO: enable x to be scalar?
+# IDEA: add verbose option
+# IDEA: have input output be single argument as tuple?
 # abstract type StoppingCriterion{T} end
 mutable struct StoppingCriterion{T, S}
     x::T # holds last value of parameters
@@ -53,34 +56,51 @@ mutable struct StoppingCriterion{T, S}
     ry::S
 
     maxiter::Int # maximum iterations
-    function StoppingCriterion(x::AbstractVector, y::Real = Inf;
-                dx = 1e-6, rx = 0., dy = 1e-6, ry = 0., maxiter::Int = 1024)
-        new{typeof(x), typeof(y)}(fill(Inf, size(x)), dx, rx, y, dy, ry, maxiter)
+    verbose::Bool
+    function StoppingCriterion(x, y::Real = Inf; dx::Real = 1e-6, rx::Real = 0.,
+        dy::Real = 1e-6, ry::Real = 0., maxiter::Int = 1024, verbose::Bool = false)
+        new{typeof(x), typeof(y)}(copy(x), dx, rx, y, dy, ry, maxiter, verbose)
     end
 end
 
-(T::StoppingCriterion)(x::AbstractVector, t::Integer) = T(x) || T(t)
-(T::StoppingCriterion)(y::Real, t::Integer) = T(y) || T(t)
-function (T::StoppingCriterion)(x::AbstractVector)
+(T::StoppingCriterion)(x) = input_criterion!(T, x)
+function (T::StoppingCriterion)(x, t::Integer)
+    T.verbose && println("in iteration $t:")
+    1 < t && (input_criterion!(T, x) || T.maxiter < t)
+end
+function (T::StoppingCriterion)(x, y::Real, t::Integer)
+    T.verbose && println("in iteration $t:")
+    1 < t && (input_criterion!(T, x) || output_criterion!(T, y) || T.maxiter < t)
+end
+
+function input_criterion!(T::StoppingCriterion, x::Union{Real, AbstractVector})
     any(isnan, x) && error("x contains NaN: x = $x")
     dx = norm(difference(x, T.x))
     rx = dx / norm(x)
-    isfixed = dx < T.dx
-    isfixed |= rx < T.rx
-    T.x .= x
+    if T.verbose
+        println("absolute change in x = $dx")
+        println("relative change in x = $rx")
+    end
+    isfixed = dx < T.dx || rx < T.rx
+    if x isa Real
+        T.x = x
+    else # AbstractVector
+        T.x .= x
+    end
     return isfixed
 end
-function (T::StoppingCriterion)(y::Real)
+function output_criterion!(T::StoppingCriterion, y::Real)
     isnan(y) && error("y = NaN")
     dy = abs(y - T.y)
     ry = dy / abs(y)
-    isfixed = dy < T.dy
-    isfixed |= ry < T.ry
-    isfixed |= T.maxiter < t
+    if T.verbose
+        println("absolute change in y = $dy")
+        println("relative change in y = $ry")
+    end
+    isfixed = dy < T.dy || ry < T.ry
     T.y = y
     return isfixed
 end
-(T::StoppingCriterion)(t::Integer) = T.maxiter < t
 
 ######################## Canonical Descent Directions ##########################
 # abstract type FixedPointIterator{T} end # makes sense as long as we stick to optimization

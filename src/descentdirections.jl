@@ -17,9 +17,9 @@ struct Gradient{T, F, V, R} <: Direction{T}
     f::F # function to be optimized
     d::V # direction
     r::R # differentiation result
-    function Gradient(f::F, x::V) where {T, V<:AbstractArray{T}, F}
-        r = DiffResults.GradientResult(x)
-        new{T, F, V, typeof(r)}(f, similar(x), r)
+    function Gradient(f, x)
+        r = x isa Number ? DiffResult(x, (one(x),)) : DiffResults.GradientResult(x)
+        new{eltype(x), typeof(f), typeof(x), typeof(r)}(f, zero(x), r)
     end
 end
 function valdir(G::Gradient, x::AbstractArray)
@@ -28,6 +28,12 @@ function valdir(G::Gradient, x::AbstractArray)
     return DiffResults.value(G.r), G.d
 end
 direction(G::Gradient, x::AbstractArray) = valdir(G, x)[2]
+# 1D gradient method for optimization
+function valdir(N::Gradient, x::Real)
+    r = derivative!(N.r, N.f, x)
+    step = -DiffResults.derivative(r)
+    return DiffResults.value(r), step
+end
 
 ################################################################################
 using ForwardDiff: DerivativeConfig, HessianConfig, JacobianConfig
@@ -138,10 +144,10 @@ end
 function BFGS(dir::Direction, x::AbstractVector,
             H⁻¹::AbstractMatrix = identity(x);
             check::Bool = true)
-    ∇ = similar(x)
-    s = similar(x)
-    y = similar(x)
-    d = similar(x)
+    ∇ = zero(x)
+    s = zero(x)
+    y = zero(x)
+    d = zero(x)
     Hy = d # we can alias memory here
     BFGS(dir, H⁻¹, copy(x), ∇, d, s, y, Hy, check)
 end
@@ -167,7 +173,7 @@ end
 # updates inverse hessian with bfgs strategy
 # could also use recursive algorithm here to reduce memory footprint (see below)
 function bfgs_update!(H⁻¹::AbstractMatrix, s::AbstractVector, y::AbstractVector,
-                    Hy::AbstractVector = similar(y), check::Bool = true)
+                    Hy::AbstractVector = zero(y), check::Bool = true)
     τ = s'y
     if τ > 0 # function strongly convex -> update inverse Hessian
         mul!(Hy, H⁻¹, y)
@@ -211,11 +217,11 @@ function LBFGS(dir::Direction, x::AbstractVector, m::Int,
     y = CircularBuffer{X}(m)
     V = typeof(s)
     for i in 1:m
-        s.buffer[i] = similar(x)
-        y.buffer[i] = similar(x)
+        s.buffer[i] = zero(x)
+        y.buffer[i] = zero(x)
     end
-    ∇ = similar(x)
-    d = similar(x)
+    ∇ = zero(x)
+    d = zero(x)
     α = zeros(eltype(x), m)
     LBFGS(dir, copy(x), ∇, d, s, y, m, α, scaling!, check)
 end
