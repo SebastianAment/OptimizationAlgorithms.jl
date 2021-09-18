@@ -29,6 +29,7 @@ fixedpoint!(f!, x) = fixedpoint!(f!, x, StoppingCriterion(x))
 
 # # TODO:
 # # f!(x, t) should return both x and y for generality with scalar case
+# this is not a problem for Directions, but for Updates
 # either rewrite update! to do this, thereby breaking it's use in fixedpoint!,
 # or write new function update_evaluate!()
 # function optimize!(f!, x, isfixed)
@@ -43,7 +44,6 @@ fixedpoint!(f!, x) = fixedpoint!(f!, x, StoppingCriterion(x))
 # optimize!(f!, x) = optimize!(f!, x, StoppingCriterion(x))
 
 ########################### Stopping Criterion ##################################
-# IDEA: add verbose option
 # IDEA: have input output be single argument as tuple?
 # abstract type StoppingCriterion{T} end
 mutable struct StoppingCriterion{T, S}
