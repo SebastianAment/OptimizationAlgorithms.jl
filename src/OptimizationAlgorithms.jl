@@ -122,11 +122,11 @@ update!(D::Direction, x, t::Int) = (x .+= D(x, t))
 
 # converting a direction to an update
 update!(D::Direction) = (x, t::Int) -> (x .+= D(x, t))
-fixedpoint!(d::Direction, x, isfixed) = fixedpoint!(update!(d), x, isfixed)
+fixedpoint!(D::Direction, x, isfixed) = fixedpoint!(update!(D), x, isfixed)
 
 function objective end # returns objective function
-objective(d::Direction, x) = d.f(x)
-objective(d::Direction) = x->objective(d, x)
+objective(D::Direction, x) = D.f(x)
+objective(D::Direction) = x->objective(D, x)
 
 const value = objective
 

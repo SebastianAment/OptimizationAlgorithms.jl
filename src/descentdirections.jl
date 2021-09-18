@@ -341,12 +341,12 @@ end
 ################################################################################
 # fd returns both value and direction
 # allow pre-allocation, using fd!
-struct CustomDirection{T, F, FD} <: Direction{T}
+struct CustomDirection{T, F, D} <: Direction{T}
     f::F # calculates objective value
-    valdir::FD # calculates objective value and gradient
-    function CustomDirection(f::F, valdir::FD, x::T) where {T<:AbstractArray, F, FD}
-        new{T, F, FD}(f, valdir)
-    end
+    valdir::D # calculates objective value and gradient
+end
+function CustomDirection(f, valdir, x)
+    CustomDirection{typeof(x), typeof(f), typeof(valdir)}(f, valdir)
 end
 valdir(D::CustomDirection, x) = D.valdir(x)
 

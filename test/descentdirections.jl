@@ -170,6 +170,7 @@ end
     x = 1e2(randn(n) .+ 1)
     @test norm(B(x)) > 1 # normal direction is large
 
+    # testing direction modifiers
     U = OptimizationAlgorithms.UnitDirection(B)
     @test U(x) isa AbstractVector
     @test norm(U(x)) ≈ 1
@@ -184,6 +185,7 @@ end
     @. x = μ + 1e-6*randn()
     @test norm(TD1(x)) ≈ norm(B(x)) # no change if gradient is sufficiently small
     @test norm(TD2(x)) ≈ norm(B(x)) # no change if gradient is sufficiently small
+
 end
 
 end # TestDescentDirections
