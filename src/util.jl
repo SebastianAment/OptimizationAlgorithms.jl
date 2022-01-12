@@ -35,3 +35,35 @@ function _circshift!(cb::CircularBuffer, shifts::Int = 1)
     end
     return cb
 end
+
+######################### Lazy Difference Vector ###############################
+# IDEA: is it worth using the LazyArrays package?
+# could be replaced by LazyVector(applied(-, x, y)), which is neat.
+# lazy difference between two vectors, has no memory footprint
+struct LazyDifference{T, U, V} <: AbstractVector{T}
+    x::U
+    y::V
+    function LazyDifference(x, y)
+        length(x) == length(y) || throw(DimensionMismatch("x and y do not have the same length: $(length(x)) and $(length(y))."))
+        T = promote_type(eltype(x), eltype(y))
+        new{T, typeof(x), typeof(y)}(x, y)
+    end
+end
+
+difference(x::Number, y::Number) = x-y # avoid laziness for scalars
+difference(x::AbstractVector, y::AbstractVector) = LazyDifference(x, y)
+difference(x::Tuple, y::Tuple) = LazyDifference(x, y)
+# this creates a type instability:
+Base.size(d::LazyDifference) = (length(d.x),)
+Base.getindex(d::LazyDifference, i::Integer) = d.x[i]-d.y[i]
+
+######################### solves with eigen factorization, used for SaddleFreeNewton
+function LinearAlgebra.ldiv!(y::AbstractVector, E::Eigen, x::AbstractVector)
+     ldiv!!(y, E, copy(x))
+end
+# WARNING: uses x as a temporary
+function ldiv!!(y::AbstractVector, E::Eigen, x::AbstractVector) # temporary
+    mul!(y, E.vectors', x)
+    @. x = y / E.values
+    mul!(y, E.vectors, x)
+end

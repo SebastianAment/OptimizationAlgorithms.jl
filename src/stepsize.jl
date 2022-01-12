@@ -5,10 +5,10 @@
 # inputs: searchcondition function, i.e. Armijo, Wolfe
 # stepupdate is step size updating policy
 function linesearch!(xn::AbstractVector, x::AbstractVector, α::Real,
-                     direction::AbstractVector, searchcondition, maxbacktrack::Int, decrease::Real = 3.)
+                     direction::AbstractVector, searchcondition!, maxbacktrack::Int, decrease::Real = 3.)
     for i in 1:maxbacktrack
         @. xn = x + α * direction # update
-        if searchcondition(α, xn)
+        if searchcondition!(α, xn)
             return true
         end
         α /= decrease
@@ -78,14 +78,14 @@ function (D::DescentCondition)(α, xn)
         if xn isa Real
             xn = D.xn
         else
-            xn .= D.xn # assign last proposal to current one
+            @. xn = D.xn # assign last proposal to current one
         end
         return true
     else
         if xn isa Real
             D.xn = xn
         else
-            D.xn .= xn
+            @. D.xn = xn
         end
         D.new_value = new_value
         return false

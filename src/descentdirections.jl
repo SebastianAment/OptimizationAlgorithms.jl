@@ -98,7 +98,7 @@ function valdir(N::SaddleFreeNewton, x::AbstractVector)
     catch PosDefException # otherwise, calculate matrix absolute value
         E = eigen!(Symmetric(H))
         @. E.values = max(abs(E.values), N.min_eigval)
-        LinearAlgebraExtensions.ldiv!!(N.d, E, ∇) # overwrites both N.d and ∇, and stores result in N.d
+        ldiv!!(N.d, E, ∇) # overwrites both N.d and ∇, and stores result in N.d
     end
     N.d .*= -1
     return DiffResults.value(N.r), N.d

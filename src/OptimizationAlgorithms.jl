@@ -1,8 +1,10 @@
 module OptimizationAlgorithms
 
 using LinearAlgebra
-using LinearAlgebraExtensions
-using LinearAlgebraExtensions: difference, LazyDifference
+# using LinearAlgebraExtensions
+# using LinearAlgebraExtensions: difference, LazyDifference
+
+difference(x, y) = x-y
 
 # principle of this package:
 # reduce optimization problems to fixed point iterations
