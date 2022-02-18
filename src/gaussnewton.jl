@@ -149,12 +149,12 @@ function optimize!(LM::LevenbergMarquart{<:Real},
 		newval, λ = lm_backtrack!(LM, x, oldx, y, λ, stn)
 		verbose isa Val{false} || lm_verbose(i, newval, val, λ, y)
 		if converged(stn, newval, val, y, i)
-			break
+			return x, i
 		end
 		val = newval
         copy!(oldx, x)
 	end
-	return x
+	return x, stn.max_iter
 end
 
 function lm_backtrack!(LM::LevenbergMarquart,

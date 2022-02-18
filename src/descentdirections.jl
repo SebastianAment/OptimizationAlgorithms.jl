@@ -175,7 +175,7 @@ end
 function bfgs_update!(H⁻¹::AbstractMatrix, s::AbstractVector, y::AbstractVector,
                     Hy::AbstractVector = zero(y), check::Bool = true)
     τ = s'y
-    if τ > 0 # function strongly convex -> update inverse Hessian
+    if τ > 0 # function strongly convex -> update inverse Hessian IDEA: can we take absolute value of τ and always update?
         mul!(Hy, H⁻¹, y)
         ρ = 1/τ
         d = (ρ * dot(y, Hy) + 1) # rank 1
