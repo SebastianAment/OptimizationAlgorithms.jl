@@ -20,7 +20,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 BenchmarkTools = "1.2"
-Clp = "0.9"
+Clp = "0.9, 1"
 DataStructures = "0.18"
 DiffResults = "1.0"
 ECOS = "0.14"
