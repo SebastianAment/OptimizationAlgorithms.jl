@@ -32,7 +32,7 @@ function update_direction!(GN::AbstractGaussNewton, λ::Real, min_diagonal::Real
     C = cholesky!(GN.JJ) # constant allocation
     ldiv!(C, GN.d)
     GN.d .*= -1
-    return norm(y), GN.d
+    return y, GN.d, J, C
 end
 
 function lm_scaling!(JJ::AbstractMatrix, λ::Real, min_diagonal::Real = 1e-12)
@@ -72,7 +72,8 @@ end
 
 function valdir(GN::GaussNewton, x::AbstractVector, min_diagonal::Real = 1e-12)
     update_jacobian!(GN, x)
-    update_direction!(GN, 0, min_diagonal)
+    y, d, _, _ = update_direction!(GN, 0, min_diagonal)
+	return norm(y), GN.d
 end
 
 ################################################################################
@@ -141,12 +142,12 @@ end
 function optimize!(LM::LevenbergMarquart{<:Real},
 			x::AbstractVector, y::AbstractVector,
 			stn::LevenbergMarquartSettings = LevenbergMarquartSettings(),
-			λ::Real = 1e-6, verbose::Union{Val{true}, Val{false}} = Val(false))
+			λ::Real = 1e-6, verbose::Union{Val{true}, Val{false}} = Val(false), geodesic::Bool=false)
     oldx = copy(x)
 	val, newval = objective!(LM, y, x), Inf
     for i in 1:stn.max_iter
 		update_jacobian!(LM, oldx)
-		newval, λ = lm_backtrack!(LM, x, oldx, y, λ, stn)
+		newval, λ = lm_backtrack!(LM, x, oldx, y, λ, stn, geodesic)
 		verbose isa Val{false} || lm_verbose(i, newval, val, λ, y)
 		if converged(stn, newval, val, y, i)
 			return x, i
@@ -159,15 +160,30 @@ end
 
 function lm_backtrack!(LM::LevenbergMarquart,
 				x::AbstractVector, oldx::AbstractVector, y::AbstractVector,
-	 								λ::Real, stn::LevenbergMarquartSettings)
+	 								λ::Real, stn::LevenbergMarquartSettings, geodesic::Bool = false)
 	val = 0.
+	h = 0.01
+	α = 0.75
+	temp = zero(y)
+	temp2 = zero(y)
+	r = zero(y)
+	dx2 = zero(x)
+	
 	for j in 1:stn.max_backtrack
-		val, dx = update_direction!(LM, λ, stn.min_diagonal)
-		@. x = oldx + dx
-		newval = objective!(LM, y, x) # norm(LM.f(y, x))
-		if !(newval ≥ val || isnan(newval) || any(x->abs(x) > stn.max_step, dx))
-			λ = max(λ / stn.decrease_factor, stn.min_λ)
-			return newval, λ
+		w, dx, J, C = update_direction!(LM, λ, stn.min_diagonal)
+		val = norm(w)
+		if geodesic
+            r = 2/h * ( (LM.f(temp2, oldx + h.*dx)- w)/h - mul!(temp, J, dx) )
+		    mul!(dx2, J', r)
+			ldiv!(C, dx2)
+		end
+		if !geodesic || (geodesic && 2(norm(dx2))/norm(dx) < α)
+			@. x = oldx + dx - 0.5dx2
+			newval = objective!(LM, y, x) # norm(LM.f(y, x))
+			if !(newval ≥ val || isnan(newval) || any(x->abs(x) > stn.max_step, dx - 0.5dx2))
+				λ = max(λ / stn.decrease_factor, stn.min_λ)
+				return newval, λ
+			end
 		end
 		λ = min(λ * stn.increase_factor, stn.max_λ)
 	end

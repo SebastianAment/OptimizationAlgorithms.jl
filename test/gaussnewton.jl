@@ -46,7 +46,21 @@ end
     # tesing out intitialization with very large lambda, min_decrease, and min_iter
     res = copy(y)
     stn = LevenbergMarquartSettings(max_iter = 16, min_decrease = 1e-10, min_resnorm = 1e-10, min_res = 0)
-    optimize!(LM, ab, res, stn) #, 1e-6, Val(true))
+    optimize!(LM, ab, res, stn, 1e-6, Val(false), false)
+    @test isapprox(ab, ab0, atol = tol)
+end
+
+@testset "Geodesic LevenbergMarquart" begin
+    n = 64
+    ab0, x, y, g, r = test_problem(n)
+    LM = LevenbergMarquart(r, ab0, y)
+    σ = .1
+    ab = ab0 + σ*randn(2)
+    tol = 1e-8
+    # tesing out intitialization with very large lambda, min_decrease, and min_iter
+    res = copy(y)
+    stn = LevenbergMarquartSettings(max_iter = 16, min_decrease = 1e-10, min_resnorm = 1e-10, min_res = 0)
+    optimize!(LM, ab, res, stn, 1e-6, Val(false), true)
     @test isapprox(ab, ab0, atol = tol)
 end
 
