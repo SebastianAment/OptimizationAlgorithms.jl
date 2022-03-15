@@ -140,14 +140,39 @@ end
 ################################################################################
 
 function optimize!(LM::LevenbergMarquart{<:Real},
-			x::AbstractVector, y::AbstractVector,
+			x::AbstractVector, y::AbstractVector, geodesic::Val{false},
 			stn::LevenbergMarquartSettings = LevenbergMarquartSettings(),
-			λ::Real = 1e-6, verbose::Union{Val{true}, Val{false}} = Val(false), geodesic::Bool=false)
+			λ::Real = 1e-6, verbose::Union{Val{true}, Val{false}} = Val(false)
+			)
     oldx = copy(x)
 	val, newval = objective!(LM, y, x), Inf
     for i in 1:stn.max_iter
 		update_jacobian!(LM, oldx)
-		newval, λ = lm_backtrack!(LM, x, oldx, y, λ, stn, geodesic)
+		newval, λ = lm_backtrack!(LM, x, oldx, y, λ, stn)
+		verbose isa Val{false} || lm_verbose(i, newval, val, λ, y)
+		if converged(stn, newval, val, y, i)
+			return x, i
+		end
+		val = newval
+        copy!(oldx, x)
+	end
+	return x, stn.max_iter
+end
+
+function optimize!(LM::LevenbergMarquart{<:Real}, x::AbstractVector, y::AbstractVector, geodesic::Val{true},
+	stn::LevenbergMarquartSettings = LevenbergMarquartSettings(),
+	λ::Real = 1e-6, h::Float64=0.01, α::Float64=0.75, verbose::Union{Val{true}, Val{false}} = Val(false))
+
+    oldx = copy(x)
+	val, newval = objective!(LM, y, x), Inf
+	temp = zero(y)
+	temp2 = zero(y)
+	r = zero(y)
+	dx2 = zero(x)
+
+    for i in 1:stn.max_iter
+		update_jacobian!(LM, oldx)
+		newval, λ = lm_geo_backtrack!(LM, x, oldx, y, temp, temp2, r, dx2, λ, h, α, stn)
 		verbose isa Val{false} || lm_verbose(i, newval, val, λ, y)
 		if converged(stn, newval, val, y, i)
 			return x, i
@@ -159,25 +184,37 @@ function optimize!(LM::LevenbergMarquart{<:Real},
 end
 
 function lm_backtrack!(LM::LevenbergMarquart,
-				x::AbstractVector, oldx::AbstractVector, y::AbstractVector,
-	 								λ::Real, stn::LevenbergMarquartSettings, geodesic::Bool = false)
+						x::AbstractVector, oldx::AbstractVector, y::AbstractVector,
+						λ::Real, stn::LevenbergMarquartSettings)
 	val = 0.
-	h = 0.01
-	α = 0.75
-	temp = zero(y)
-	temp2 = zero(y)
-	r = zero(y)
-	dx2 = zero(x)
+	for j in 1:stn.max_backtrack
+		w, dx, _, _ = update_direction!(LM, λ, stn.min_diagonal)
+		val = norm(w)
+		@. x = oldx + dx
+		newval = objective!(LM, y, x) # norm(LM.f(y, x))
+		if !(newval ≥ val || isnan(newval) || any(x->abs(x) > stn.max_step, dx))
+			λ = max(λ / stn.decrease_factor, stn.min_λ)
+			return newval, λ
+		end
+		λ = min(λ * stn.increase_factor, stn.max_λ)
+	end
+	copy!(x, oldx) # if backtracking wasn't successful
+	return val, λ
+end
+
+function lm_geo_backtrack!(LM::LevenbergMarquart,
+	x::AbstractVector, oldx::AbstractVector, y::AbstractVector, 
+	temp::AbstractVector, temp2::AbstractVector, r::AbstractVector, dx2::AbstractVector,
+	λ::Real, h::Float64=0.01, α::Float64=0.75, stn::LevenbergMarquartSettings = LevenbergMarquartSettings())
 	
+	val = 0.
 	for j in 1:stn.max_backtrack
 		w, dx, J, C = update_direction!(LM, λ, stn.min_diagonal)
 		val = norm(w)
-		if geodesic
-            r = 2/h * ( (LM.f(temp2, oldx + h.*dx)- w)/h - mul!(temp, J, dx) )
-		    mul!(dx2, J', r)
-			ldiv!(C, dx2)
-		end
-		if !geodesic || (geodesic && 2(norm(dx2))/norm(dx) < α)
+		r .= 2/h * ( (LM.f(temp2, oldx + h.*dx)- w)/h - mul!(temp, J, dx) )
+		mul!(dx2, J', r)
+		ldiv!(C, dx2)
+		if 2(norm(dx2))/norm(dx) < α
 			@. x = oldx + dx - 0.5dx2
 			newval = objective!(LM, y, x) # norm(LM.f(y, x))
 			if !(newval ≥ val || isnan(newval) || any(x->abs(x) > stn.max_step, dx - 0.5dx2))
@@ -187,8 +224,7 @@ function lm_backtrack!(LM::LevenbergMarquart,
 		end
 		λ = min(λ * stn.increase_factor, stn.max_λ)
 	end
-	copy!(x, oldx) # if backtracking wasn't successful
-	return val, λ
+	copy!(x, oldx) #
 end
 
 function converged(stn::LevenbergMarquartSettings, newval::Real, val::Real,

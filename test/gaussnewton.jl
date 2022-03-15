@@ -46,7 +46,7 @@ end
     # tesing out intitialization with very large lambda, min_decrease, and min_iter
     res = copy(y)
     stn = LevenbergMarquartSettings(max_iter = 16, min_decrease = 1e-10, min_resnorm = 1e-10, min_res = 0)
-    optimize!(LM, ab, res, stn, 1e-6, Val(false), false)
+    optimize!(LM, ab, res, Val(false), stn, 1e-6, Val(true))
     @test isapprox(ab, ab0, atol = tol)
 end
 
@@ -60,7 +60,7 @@ end
     # tesing out intitialization with very large lambda, min_decrease, and min_iter
     res = copy(y)
     stn = LevenbergMarquartSettings(max_iter = 16, min_decrease = 1e-10, min_resnorm = 1e-10, min_res = 0)
-    optimize!(LM, ab, res, stn, 1e-6, Val(false), true)
+    optimize!(LM, ab, res, Val(true), stn, 1e-6, 0.01, 0.75, Val(true))
     @test isapprox(ab, ab0, atol = tol)
 end
 
